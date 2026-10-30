@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* MetroSched tokens: depot signage palette. Assignment colours validated for CVD (dataviz validator). */
+:root {
+  --background: #f3f6f7;
+  --foreground: #13262f;
+  --card: #ffffff;
+  --card-foreground: #13262f;
+  --popover: #ffffff;
+  --popover-foreground: #13262f;
+  --primary: #0f7fa8;
+  --primary-foreground: #ffffff;
+  --secondary: #e4ecef;
+  --secondary-foreground: #13262f;
+  --muted: #e9eef0;
+  --muted-foreground: #4f626b;
+  --accent: #dcebf1;
+  --accent-foreground: #13262f;
+  --destructive: #c4314b;
+  --border: #d3dde1;
+  --input: #c6d2d7;
+  --ring: #0f7fa8;
+  --radius: 0.375rem;
+
+  --revenue: #0f7fa8;
+  --standby: #b7790a;
+  --ibl: #c4314b;
+  --plate: #13262f;
+  --plate-ink: #f3f6f7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-revenue: var(--revenue);
+  --color-standby: var(--standby);
+  --color-ibl: var(--ibl);
+  --color-plate: var(--plate);
+  --color-plate-ink: var(--plate-ink);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --font-sans: var(--font-barlow);
+  --font-condensed: var(--font-barlow-condensed);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

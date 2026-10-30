@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.db
+.env
+node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+.claude-flow/
+.pytest_cache/
+.swarm/
