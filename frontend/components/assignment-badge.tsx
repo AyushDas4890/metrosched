@@ -3,9 +3,9 @@ import { ASSIGNMENT_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const STYLE: Record<Assignment, string> = {
-  REVENUE: "border-revenue text-revenue bg-revenue/10",
-  STANDBY: "border-standby text-[#7a5106] bg-standby/10",
-  IBL: "border-ibl text-ibl bg-ibl/10",
+  REVENUE: "border-revenue/60 text-revenue-ink bg-revenue/15",
+  STANDBY: "border-standby/60 text-standby-ink bg-standby/15",
+  IBL: "border-ibl/60 text-ibl-ink bg-ibl/15",
 };
 const ICON: Record<Assignment, string> = { REVENUE: "▶", STANDBY: "❚❚", IBL: "⚒" };
 

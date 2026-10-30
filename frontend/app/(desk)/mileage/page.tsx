@@ -3,10 +3,11 @@
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { km, mileageDeviation } from "@/lib/format";
+import { TOOLTIP } from "@/lib/chart";
 import { useFleet } from "@/lib/use-fleet";
 
-const BELOW = "#0f7fa8";
-const ABOVE = "#b7790a";
+const BELOW = "var(--revenue)";
+const ABOVE = "var(--standby)";
 
 export default function MileageBranding() {
   const { fleet, error } = useFleet();
@@ -28,8 +29,8 @@ export default function MileageBranding() {
   return (
     <div>
       <PageHeader title="Mileage & branding" />
-      <section aria-labelledby="km" className="mb-8 rounded-md border bg-card p-4">
-        <h2 id="km" className="font-condensed text-xl font-bold">
+      <section aria-labelledby="km" className="mb-8 rounded-xl border bg-card p-5">
+        <h2 id="km" className="font-condensed text-2xl font-bold">
           Cumulative mileage against the fleet mean of {km(mean)}
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
@@ -48,11 +49,11 @@ export default function MileageBranding() {
         <div className="h-[340px]">
           <ResponsiveContainer>
             <BarChart data={dev} margin={{ left: 16, right: 8 }} barCategoryGap={2}>
-              <CartesianGrid vertical={false} stroke="#e3e9ec" />
-              <XAxis dataKey="train_id" tick={{ fontSize: 11, fill: "#13262f" }} interval={0} angle={-60} textAnchor="end" height={56} />
-              <YAxis tick={{ fontSize: 12, fill: "#4f626b" }} tickFormatter={(v) => `${v / 1000}k`} />
-              <ReferenceLine y={0} stroke="#13262f" />
-              <Tooltip formatter={(v) => [`${Number(v) > 0 ? "+" : ""}${Number(v).toLocaleString("en-IN")} km`, "From mean"]} />
+              <CartesianGrid vertical={false} stroke="var(--grid)" />
+              <XAxis dataKey="train_id" tick={{ fontSize: 11, fill: "var(--foreground)" }} interval={0} angle={-60} textAnchor="end" height={56} />
+              <YAxis tick={{ fontSize: 12, fill: "var(--axis)" }} tickFormatter={(v) => `${v / 1000}k`} />
+              <ReferenceLine y={0} stroke="var(--axis)" />
+              <Tooltip {...TOOLTIP} formatter={(v) => [`${Number(v) > 0 ? "+" : ""}${Number(v).toLocaleString("en-IN")} km`, "From mean"]} />
               <Bar dataKey="deviation" isAnimationActive={false} radius={4}>
                 {dev.map((d) => (
                   <Cell key={d.train_id} fill={d.deviation < 0 ? BELOW : ABOVE} />
@@ -63,8 +64,8 @@ export default function MileageBranding() {
         </div>
       </section>
 
-      <section aria-labelledby="br" className="rounded-md border bg-card p-4">
-        <h2 id="br" className="font-condensed text-xl font-bold">
+      <section aria-labelledby="br" className="rounded-xl border bg-card p-5">
+        <h2 id="br" className="font-condensed text-2xl font-bold">
           Branding exposure shortfall over the last 7 days
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
@@ -73,10 +74,10 @@ export default function MileageBranding() {
         <div className="h-[300px]">
           <ResponsiveContainer>
             <BarChart data={branded} layout="vertical" margin={{ left: 8, right: 24 }} barCategoryGap={4}>
-              <CartesianGrid horizontal={false} stroke="#e3e9ec" />
-              <XAxis type="number" unit=" h" tick={{ fontSize: 12, fill: "#4f626b" }} />
-              <YAxis type="category" dataKey="train_id" width={56} tick={{ fontSize: 12, fill: "#13262f" }} interval={0} />
-              <Tooltip formatter={(v, _n, p) => [`${v} h short (needs ${p.payload.min} h/day)`, p.payload.advertiser]} />
+              <CartesianGrid horizontal={false} stroke="var(--grid)" />
+              <XAxis type="number" unit=" h" tick={{ fontSize: 12, fill: "var(--axis)" }} />
+              <YAxis type="category" dataKey="train_id" width={56} tick={{ fontSize: 12, fill: "var(--foreground)" }} interval={0} />
+              <Tooltip {...TOOLTIP} formatter={(v, _n, p) => [`${v} h short (needs ${p.payload.min} h/day)`, p.payload.advertiser]} />
               <Bar dataKey="shortfall" fill={BELOW} radius={[0, 4, 4, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>

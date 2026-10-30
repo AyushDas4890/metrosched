@@ -36,7 +36,9 @@ Optional settings are in `.env.example`. The defaults work without a `.env` file
   - If no plan satisfies every hard rule, the API returns the smallest relaxation instead of a plan.
 - **Explanations** (`optimizer/explain.py`): reasons come from rules, not from an LLM. For example: "Rolling-Stock fitness certificate expired on 2026-10-31 (hard rule)".
 - **Override learning** (`backend/ml/learner.py`): each supervisor override is logged together with the train's features. After 20 overrides, a logistic regression rescales the soft weights. Below 20, the default weights are used.
-- **Dashboard** (`frontend/`): Next.js, Tailwind, shadcn/ui and Recharts. Pages: Tonight's plan, Fleet health, Mileage & branding, Depot bay map, What-if simulator, Override log.
+- **Dashboard** (`frontend/`): Next.js, Tailwind, shadcn/ui and Recharts, with Motion (Framer Motion) springs and two React Bits components (CountUp, SpotlightCard). Pages: Tonight's plan, Fleet health, Mileage & branding, Depot bay map, What-if simulator, Override log.
+- **Story page** (`/story`): a scroll-driven 3D walkthrough of one night at the depot, built with GSAP ScrollTrigger and CSS 3D transforms. It falls back to static layouts when the system asks for reduced motion.
+- **Design rationale and self-critique:** [docs/DESIGN_CRITIQUE.md](docs/DESIGN_CRITIQUE.md).
 
 ## API
 

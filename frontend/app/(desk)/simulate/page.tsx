@@ -65,7 +65,7 @@ export default function Simulator() {
   return (
     <div>
       <PageHeader title="What-if simulator" />
-      <form onSubmit={run} className="mb-6 grid max-w-3xl gap-4 rounded-md border bg-card p-4 md:grid-cols-3">
+      <form onSubmit={run} className="mb-6 grid max-w-3xl gap-4 rounded-xl border bg-card p-5 md:grid-cols-3">
         <label className="text-sm md:col-span-3">
           Scenario
           <select className={field} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
@@ -125,8 +125,8 @@ export default function Simulator() {
 function SimulationResult({ result }: { result: SimulateResult }) {
   if (!result.scenario.feasible) {
     return (
-      <section className="rounded-md border border-ibl/50 bg-card p-4" aria-live="polite">
-        <h2 className="font-condensed text-xl font-bold">This scenario leaves no valid plan</h2>
+      <section className="rounded-xl border border-ibl/50 bg-card p-5" aria-live="polite">
+        <h2 className="font-condensed text-2xl font-bold">This scenario leaves no valid plan</h2>
         <ul className="mt-2 list-disc pl-5">
           {result.scenario.relaxations.map((r, i) => (
             <li key={i}>{r.message}</li>
@@ -138,8 +138,8 @@ function SimulationResult({ result }: { result: SimulateResult }) {
   const before = countBy(result.baseline.items);
   const after = countBy(result.scenario.items);
   return (
-    <section aria-live="polite" className="rounded-md border bg-card p-4">
-      <h2 className="mb-2 font-condensed text-xl font-bold">
+    <section aria-live="polite" className="rounded-xl border bg-card p-5">
+      <h2 className="mb-2 font-condensed text-2xl font-bold">
         {result.changes.length === 0 ? "No assignments change" : `${result.changes.length} assignment(s) change`}
       </h2>
       <p className="mb-4 text-sm text-muted-foreground">

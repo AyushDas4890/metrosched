@@ -4,9 +4,10 @@ import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer,
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { TrainPlate } from "@/components/train-plate";
 import { earliestExpiry, expiryTone } from "@/lib/format";
+import { TOOLTIP } from "@/lib/chart";
 import { useFleet } from "@/lib/use-fleet";
 
-const TONE_COLOR = { expired: "#c4314b", soon: "#b7790a", ok: "#0f7fa8" } as const;
+const TONE_COLOR = { expired: "var(--ibl)", soon: "var(--standby)", ok: "var(--revenue)" } as const;
 const TONE_LABEL = { expired: "Expired", soon: "Expires within 7 days", ok: "Valid" } as const;
 type Tone = keyof typeof TONE_LABEL;
 
@@ -29,8 +30,8 @@ export default function FleetHealth() {
   return (
     <div>
       <PageHeader title="Fleet health" />
-      <section aria-labelledby="exp" className="mb-8 rounded-md border bg-card p-4">
-        <h2 id="exp" className="font-condensed text-xl font-bold">
+      <section aria-labelledby="exp" className="mb-8 rounded-xl border bg-card p-5">
+        <h2 id="exp" className="font-condensed text-2xl font-bold">
           Days until each train&apos;s earliest fitness certificate expires
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
@@ -47,11 +48,11 @@ export default function FleetHealth() {
         <div className="h-[560px]">
           <ResponsiveContainer>
             <BarChart data={expiry} layout="vertical" margin={{ left: 8, right: 24 }} barCategoryGap={2}>
-              <CartesianGrid horizontal={false} stroke="#e3e9ec" />
-              <XAxis type="number" tick={{ fontSize: 12, fill: "#4f626b" }} unit=" d" />
-              <YAxis type="category" dataKey="train_id" width={56} tick={{ fontSize: 12, fill: "#13262f" }} interval={0} />
-              <ReferenceLine x={0} stroke="#13262f" />
-              <Tooltip
+              <CartesianGrid horizontal={false} stroke="var(--grid)" />
+              <XAxis type="number" tick={{ fontSize: 12, fill: "var(--axis)" }} unit=" d" />
+              <YAxis type="category" dataKey="train_id" width={56} tick={{ fontSize: 12, fill: "var(--foreground)" }} interval={0} />
+              <ReferenceLine x={0} stroke="var(--axis)" />
+              <Tooltip {...TOOLTIP}
                 formatter={(v, _n, p) => [`${v} days (${TONE_LABEL[p.payload.tone as Tone]})`, "Earliest expiry"]}
               />
               <Bar dataKey="days" radius={[0, 4, 4, 0]} isAnimationActive={false}>
@@ -90,8 +91,8 @@ export default function FleetHealth() {
         </details>
       </section>
 
-      <section aria-labelledby="jobs" className="rounded-md border bg-card p-4">
-        <h2 id="jobs" className="mb-3 font-condensed text-xl font-bold">
+      <section aria-labelledby="jobs" className="rounded-xl border bg-card p-5">
+        <h2 id="jobs" className="mb-3 font-condensed text-2xl font-bold">
           Open job cards ({openJobs.length})
         </h2>
         <div className="overflow-x-auto">
@@ -113,7 +114,7 @@ export default function FleetHealth() {
                     <TrainPlate id={j.assetnum} className="text-sm" />
                   </td>
                   <td>{j.description}</td>
-                  <td className={j.wopriority === "CRITICAL" ? "font-semibold text-ibl" : ""}>
+                  <td className={j.wopriority === "CRITICAL" ? "font-semibold text-ibl-ink" : ""}>
                     {j.wopriority === "CRITICAL" ? "⛔ Critical, blocks service" : j.wopriority.toLowerCase()}
                   </td>
                   <td>{j.reportdate}</td>

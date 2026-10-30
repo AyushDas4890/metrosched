@@ -1,0 +1,152 @@
+/* 3D motion-graphics story page. Pure CSS 3D (perspective + preserve-3d), driven by GSAP ScrollTrigger. */
+.story {
+  --train-h: 22px;
+  background:
+    radial-gradient(1200px 600px at 70% -10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 70%),
+    var(--background);
+  color: var(--foreground);
+  overflow-x: clip;
+}
+
+.stage {
+  perspective: 1600px;
+  perspective-origin: 50% 30%;
+}
+
+.floor {
+  position: relative;
+  width: 980px;
+  height: 460px;
+  transform-style: preserve-3d;
+  border-radius: 24px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 59px, color-mix(in srgb, var(--border) 70%, transparent) 59px 60px),
+    repeating-linear-gradient(0deg, transparent 0 59px, color-mix(in srgb, var(--border) 70%, transparent) 59px 60px),
+    color-mix(in srgb, var(--card) 85%, transparent);
+  box-shadow: 0 60px 120px -40px rgba(0, 0, 0, 0.7);
+}
+
+.rail {
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  height: 46px;
+  border-top: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+}
+
+.bay-label {
+  position: absolute;
+  font-family: var(--font-barlow-condensed);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  font-size: 15px;
+}
+
+.train {
+  position: absolute;
+  width: 170px;
+  height: 46px;
+  transform-style: preserve-3d;
+}
+
+.train .face-top {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--plate);
+  color: var(--plate-ink);
+  font-family: var(--font-barlow-condensed);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  transform: translateZ(var(--train-h));
+  backface-visibility: hidden;
+}
+
+.train .face-front {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 100%;
+  height: var(--train-h);
+  transform-origin: top;
+  transform: rotateX(90deg);
+  border-radius: 0 0 6px 6px;
+  background: #9fb3bc;
+}
+
+.train .face-side {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: var(--train-h);
+  height: 100%;
+  transform-origin: left;
+  transform: rotateY(-90deg);
+  background: #7b919b;
+}
+
+.ring {
+  position: relative;
+  width: 260px;
+  height: 180px;
+  transform-style: preserve-3d;
+}
+
+.ring-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floor {
+    transform: rotateX(55deg) rotateZ(-30deg);
+  }
+}
+
+/* Fit the fixed-size 3D floor to narrower viewports without touching the GSAP-driven transform. */
+.floor-fit {
+  scale: 1;
+  transform-style: preserve-3d;
+}
+@media (max-width: 1150px) {
+  .floor-fit { scale: 0.78; }
+}
+@media (max-width: 860px) {
+  .floor-fit { scale: 0.6; }
+}
+@media (max-width: 600px) {
+  .floor-fit { scale: 0.4; }
+  .ring { scale: 0.7; }
+}
+
+/* Reduced motion: the carousel becomes a plain grid; no 3D turning. */
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    width: min(100%, 960px);
+    height: auto;
+    transform-style: flat;
+  }
+  .ring-card {
+    position: static;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

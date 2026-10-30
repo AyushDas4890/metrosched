@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils";
 import { useFleet } from "@/lib/use-fleet";
 import type { Assignment } from "@/lib/types";
 
+const SHORT: Record<Assignment, string> = { REVENUE: "Rev", STANDBY: "Stby", IBL: "IBL" };
+
 const FILL: Record<Assignment, string> = {
-  REVENUE: "border-revenue bg-revenue/15",
-  STANDBY: "border-standby bg-standby/15",
-  IBL: "border-ibl bg-ibl/15",
+  REVENUE: "border-revenue bg-revenue/30",
+  STANDBY: "border-standby bg-standby/30",
+  IBL: "border-ibl bg-ibl/30",
 };
 
 export default function DepotMap() {
@@ -36,8 +38,8 @@ export default function DepotMap() {
         ))}
       </ul>
 
-      <section aria-labelledby="stab" className="mb-8 rounded-md border bg-card p-4">
-        <h2 id="stab" className="mb-1 font-condensed text-xl font-bold">
+      <section aria-labelledby="stab" className="mb-8 rounded-xl border bg-card p-5">
+        <h2 id="stab" className="mb-1 font-condensed text-2xl font-bold">
           Stabling lines tonight
         </h2>
         <p className="mb-4 text-sm text-muted-foreground">
@@ -65,7 +67,7 @@ export default function DepotMap() {
                         )}
                       >
                         <span className="font-condensed text-base font-bold">{t ? t.train_id : "empty"}</span>
-                        <span className="text-[11px] text-muted-foreground">P{b.position}</span>
+                        <span className="text-[11px] text-muted-foreground">P{b.position}{a ? ` · ${SHORT[a]}` : ""}</span>
                       </li>
                     );
                   })}
@@ -76,8 +78,8 @@ export default function DepotMap() {
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section aria-labelledby="ibl" className="rounded-md border bg-card p-4">
-          <h2 id="ibl" className="mb-2 font-condensed text-xl font-bold">
+        <section aria-labelledby="ibl" className="rounded-xl border bg-card p-5">
+          <h2 id="ibl" className="mb-2 font-condensed text-2xl font-bold">
             Inspection bay line ({ibl.length} of {fleet.config.ibl_capacity} bays)
           </h2>
           <ul className="space-y-1 text-sm">
@@ -88,8 +90,8 @@ export default function DepotMap() {
             ))}
           </ul>
         </section>
-        <section aria-labelledby="sh" className="rounded-md border bg-card p-4">
-          <h2 id="sh" className="mb-2 font-condensed text-xl font-bold">
+        <section aria-labelledby="sh" className="rounded-xl border bg-card p-5">
+          <h2 id="sh" className="mb-2 font-condensed text-2xl font-bold">
             Shunting moves needed ({shunts.length})
           </h2>
           {shunts.length === 0 ? (

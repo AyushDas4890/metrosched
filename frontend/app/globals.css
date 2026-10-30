@@ -1,32 +1,41 @@
 @import "tailwindcss";
 
-/* MetroSched tokens: depot signage palette. Assignment colours validated for CVD (dataviz validator). */
+/* MetroSched brand: night-shift operator desk.
+   Assignment colours validated for CVD against the card surface #13232D (dataviz validator, dark mode). */
 :root {
-  --background: #f3f6f7;
-  --foreground: #13262f;
-  --card: #ffffff;
-  --card-foreground: #13262f;
-  --popover: #ffffff;
-  --popover-foreground: #13262f;
-  --primary: #0f7fa8;
-  --primary-foreground: #ffffff;
-  --secondary: #e4ecef;
-  --secondary-foreground: #13262f;
-  --muted: #e9eef0;
-  --muted-foreground: #4f626b;
-  --accent: #dcebf1;
-  --accent-foreground: #13262f;
-  --destructive: #c4314b;
-  --border: #d3dde1;
-  --input: #c6d2d7;
-  --ring: #0f7fa8;
-  --radius: 0.375rem;
+  --background: #0e1a21;
+  --foreground: #e6edf0;
+  --card: #13232d;
+  --card-foreground: #e6edf0;
+  --popover: #172a35;
+  --popover-foreground: #e6edf0;
+  --primary: #2a9fc6;
+  --primary-foreground: #06131a;
+  --secondary: #1d3340;
+  --secondary-foreground: #e6edf0;
+  --muted: #182c37;
+  --muted-foreground: #93a6af;
+  --accent: #1d3340;
+  --accent-foreground: #e6edf0;
+  --destructive: #da5670;
+  --border: #243945;
+  --input: #2d4553;
+  --ring: #6cc6e6;
+  --radius: 0.75rem;
 
-  --revenue: #0f7fa8;
-  --standby: #b7790a;
-  --ibl: #c4314b;
-  --plate: #13262f;
-  --plate-ink: #f3f6f7;
+  /* Assignment marks (charts, fills) and their text tints (small text on tinted backgrounds). */
+  --revenue: #2a9fc6;
+  --standby: #bc8422;
+  --ibl: #da5670;
+  --revenue-ink: #7fd0ee;
+  --standby-ink: #e8b968;
+  --ibl-ink: #f39aab;
+  --grid: #213541;
+  --axis: #93a6af;
+
+  /* Train plate: a light stencilled plate on the dark desk, the one bold brand element. */
+  --plate: #e6edf0;
+  --plate-ink: #0e1a21;
 }
 
 @theme inline {
@@ -51,11 +60,15 @@
   --color-revenue: var(--revenue);
   --color-standby: var(--standby);
   --color-ibl: var(--ibl);
+  --color-revenue-ink: var(--revenue-ink);
+  --color-standby-ink: var(--standby-ink);
+  --color-ibl-ink: var(--ibl-ink);
   --color-plate: var(--plate);
   --color-plate-ink: var(--plate-ink);
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --font-sans: var(--font-barlow);
   --font-condensed: var(--font-barlow-condensed);
 }
@@ -64,9 +77,35 @@
   border-color: var(--border);
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* Size-specific tracking: tighten large display type, leave body at 0. */
+.display {
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+/* Translucent material for floating chrome; content scrolls beneath it. */
+.material {
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Instant press feedback on pointer-down. */
+.pressable {
+  transition: transform 100ms ease-out, background-color 120ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.98);
 }
 
 :focus-visible {
@@ -74,9 +113,23 @@ body {
   outline-offset: 2px;
 }
 
+select,
+input,
+textarea {
+  color-scheme: dark;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material {
+    background: var(--card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }

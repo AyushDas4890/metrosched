@@ -30,8 +30,8 @@ export default function OverrideLog() {
   return (
     <div>
       <PageHeader title="Override log" />
-      <section aria-labelledby="w" className="mb-6 rounded-md border bg-card p-4">
-        <h2 id="w" className="font-condensed text-xl font-bold">
+      <section aria-labelledby="w" className="mb-6 rounded-xl border bg-card p-5">
+        <h2 id="w" className="font-condensed text-2xl font-bold">
           How overrides shape the optimizer
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
@@ -49,8 +49,8 @@ export default function OverrideLog() {
         </dl>
       </section>
 
-      <section aria-labelledby="log" className="rounded-md border bg-card p-4">
-        <h2 id="log" className="mb-3 font-condensed text-xl font-bold">
+      <section aria-labelledby="log" className="rounded-xl border bg-card p-5">
+        <h2 id="log" className="mb-3 font-condensed text-2xl font-bold">
           Supervisor overrides ({rows.length})
         </h2>
         {rows.length === 0 ? (
