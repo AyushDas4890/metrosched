@@ -5,12 +5,14 @@ from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
-from .constraints import ASSIGNMENTS, IBL, REVENUE, STANDBY, cleaning_due, is_fit, open_noncritical_jobs
+from .constraints import (ASSIGNMENTS, IBL, REVENUE, STANDBY, cleaning_due, goals_not_used, is_fit,
+                          open_noncritical_jobs, rules_not_checked)
 from .explain import explain
 from .snapshot import FleetSnapshot
 
 DEFAULT_WEIGHTS = {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0, "maintenance": 4.0,
-                   "apu_risk": 500.0}
+                   "apu_risk": 500.0, "compressor_duty": 2.0, "low_pressure": 5.0}
+APU_ALERT_AT = 0.5
 TIME_LIMIT_S = 8.0
 RELAX_PENALTY = 1_000_000
 
@@ -34,6 +36,8 @@ class PlanResult:
     objective: float = 0.0
     solve_seconds: float = 0.0
     weights: dict = field(default_factory=dict)
+    rules_not_checked: list[str] = field(default_factory=list)
+    goals_not_used: list[str] = field(default_factory=list)
 
 
 def shunt_pairs(snap: FleetSnapshot) -> list[tuple[str, str]]:
@@ -56,6 +60,19 @@ def apu_risk(snap: FleetSnapshot, train_id: str) -> float:
     return float(snap.apu.get(train_id, {}).get("risk", 0.0))
 
 
+def apu_stat(snap: FleetSnapshot, train_id: str, key: str) -> float:
+    return float(snap.apu.get(train_id, {}).get(key, 0.0))
+
+
+def fleet_mean(snap: FleetSnapshot, values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
+def real_alarms(snap: FleetSnapshot, train_id: str) -> int:
+    """Count of real sensor alarms on this train's slice: high fault risk, time below 7 bar."""
+    return int(apu_risk(snap, train_id) >= APU_ALERT_AT) + int(apu_stat(snap, train_id, "low_pressure_minutes") > 0)
+
+
 def candidate_score(snap: FleetSnapshot, train: dict, weights: dict, mean_km: float) -> float:
     """Assignment-independent desirability for revenue service; used for ranking and per-train score."""
     tid = train["train_id"]
@@ -63,12 +80,16 @@ def candidate_score(snap: FleetSnapshot, train: dict, weights: dict, mean_km: fl
     br = snap.branding.get(tid)
     if br:
         s += weights["branding"] * (br["min_hours_per_day"] + br["hours_shortfall_7d"]) / 10
-    s -= weights["mileage"] * (train["cumulative_km"] - mean_km) / 10_000
-    bay = snap.bays.get(train["bay_id"])
+    if snap.available["mileage"]:
+        s -= weights["mileage"] * (train["cumulative_km"] - mean_km) / 10_000
+    bay = snap.bays.get(train.get("bay_id"))
     if bay and bay["kind"] == "STABLING":
         s -= weights["shunting"] * (bay["position"] - 1)
     s -= weights["maintenance"] * len(open_noncritical_jobs(snap, tid))
     s -= weights["apu_risk"] * apu_risk(snap, tid) / 10
+    s -= weights["low_pressure"] * min(apu_stat(snap, tid, "low_pressure_minutes"), 60) / 10
+    duty_mean = fleet_mean(snap, [apu_stat(snap, t["train_id"], "duty") for t in snap.trains])
+    s -= weights["compressor_duty"] * (apu_stat(snap, tid, "duty") - duty_mean) * 10
     if not is_fit(snap, tid):
         s -= 100
     return round(s, 1)
@@ -95,11 +116,13 @@ def _build(snap: FleetSnapshot, weights: dict, relax: bool):
     m.add(rev + slack_var("required_revenue", n) == snap.required_revenue)
     m.add(sum(x[t, STANDBY] for t in ids) + slack_var("min_standby", n) >= snap.min_standby)
     m.add(sum(x[t, IBL] for t in ids) <= snap.ibl_capacity + slack_var("ibl_capacity", n))
-    due = [t["train_id"] for t in snap.trains if cleaning_due(snap, t)]
-    m.add(sum(x[t, REVENUE] for t in due) <= snap.cleaning_slots + slack_var("cleaning_slots", n))
+    if snap.available["cleaning"]:
+        due = [t["train_id"] for t in snap.trains if cleaning_due(snap, t)]
+        m.add(sum(x[t, REVENUE] for t in due) <= snap.cleaning_slots + slack_var("cleaning_slots", n))
 
-    # Soft objective (integer-scaled, minimise).
-    mean_km = sum(t["cumulative_km"] for t in snap.trains) / n
+    # Soft objective (integer-scaled, minimise). Terms whose input is not loaded are left out.
+    mean_km = fleet_mean(snap, [t["cumulative_km"] for t in snap.trains]) if snap.available["mileage"] else 0.0
+    duty_mean = fleet_mean(snap, [apu_stat(snap, t["train_id"], "duty") for t in snap.trains])
     terms = []
     for tr in snap.trains:
         t = tr["train_id"]
@@ -107,12 +130,16 @@ def _build(snap: FleetSnapshot, weights: dict, relax: bool):
         if br:
             need = br["min_hours_per_day"] + br["hours_shortfall_7d"]
             terms.append(int(weights["branding"] * need) * (1 - x[t, REVENUE]))
-        terms.append(int(weights["mileage"] * (tr["cumulative_km"] - mean_km) / 1000) * x[t, REVENUE])
+        if snap.available["mileage"]:
+            terms.append(int(weights["mileage"] * (tr["cumulative_km"] - mean_km) / 1000) * x[t, REVENUE])
         terms.append(int(weights["apu_risk"] * apu_risk(snap, t)) * x[t, REVENUE])
+        # Real MetroPT-3 operating statistics: minutes below 7 bar, and loaded share above the fleet mean.
+        terms.append(int(weights["low_pressure"] * min(apu_stat(snap, t, "low_pressure_minutes"), 60)) * x[t, REVENUE])
+        terms.append(int(weights["compressor_duty"] * (apu_stat(snap, t, "duty") - duty_mean) * 100) * x[t, REVENUE])
         terms.append(-int(weights["standby"] * 10) * x[t, STANDBY])
         if is_fit(snap, t):
-            jobs = len(open_noncritical_jobs(snap, t))
-            terms.append(-int(weights["maintenance"] * 10 * jobs) * x[t, IBL])
+            work = len(open_noncritical_jobs(snap, t)) + real_alarms(snap, t)
+            terms.append(-int(weights["maintenance"] * 10 * work) * x[t, IBL])
     for t, u in shunt_pairs(snap):
         mv = m.new_bool_var(f"mv_{t}_{u}")
         m.add(mv >= x[t, REVENUE] - x[u, REVENUE])
@@ -142,7 +169,8 @@ def solve(snap: FleetSnapshot, weights: dict | None = None) -> PlanResult:
     for rank, (t, score) in enumerate(scored, start=1):
         reasons, alerts = explain(snap, t, assignment, mean_km)
         items.append(PlanItem(t["train_id"], t["depot_id"], assignment[t["train_id"]], rank, score, reasons, alerts))
-    return PlanResult(True, items, [], solver.objective_value, solver.wall_time, weights)
+    return PlanResult(True, items, [], solver.objective_value, solver.wall_time, weights,
+                      rules_not_checked(snap), goals_not_used(snap))
 
 
 def _relaxation_report(snap: FleetSnapshot, weights: dict) -> PlanResult:
@@ -161,4 +189,4 @@ def _relaxation_report(snap: FleetSnapshot, weights: dict) -> PlanResult:
     unfit = sum(1 for t in snap.trains if not is_fit(snap, t["train_id"]))
     relax.append({"constraint": "info", "relax_by": 0,
                   "message": f"{unfit} train(s) unfit (certificates / critical job cards are never relaxed)"})
-    return PlanResult(False, [], relax, 0.0, solver.wall_time, weights)
+    return PlanResult(False, [], relax, 0.0, solver.wall_time, weights, rules_not_checked(snap), goals_not_used(snap))

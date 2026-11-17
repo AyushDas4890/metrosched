@@ -22,12 +22,13 @@ FEATURES = {"branding_need": "branding", "low_mileage": "mileage", "exit_bay": "
 
 
 def features(snap: FleetSnapshot, train: dict) -> dict:
-    mean_km = sum(t["cumulative_km"] for t in snap.trains) / len(snap.trains)
+    kms = [t["cumulative_km"] for t in snap.trains if t.get("cumulative_km") is not None]
+    mean_km = sum(kms) / len(kms) if kms else 0.0
     br = snap.branding.get(train["train_id"])
-    bay = snap.bays.get(train["bay_id"]) or {"position": 1}
+    bay = snap.bays.get(train.get("bay_id")) or {"position": 1}
     return {
         "branding_need": (br["min_hours_per_day"] + br["hours_shortfall_7d"]) if br else 0.0,
-        "low_mileage": -(train["cumulative_km"] - mean_km) / 10_000,
+        "low_mileage": -(train["cumulative_km"] - mean_km) / 10_000 if train.get("cumulative_km") is not None else 0.0,
         "exit_bay": -(bay["position"] - 1),
         "few_jobs": -len(open_noncritical_jobs(snap, train["train_id"])),
         "cleaning_due": 1.0 if cleaning_due(snap, train) else 0.0,

@@ -12,7 +12,7 @@ import type { Scenario, SimulateResult } from "@/lib/types";
 
 type Kind = Scenario["type"];
 const KINDS: { value: Kind; label: string }[] = [
-  { value: "cert_expire", label: "A fitness certificate expires" },
+  { value: "cert_expire", label: "A fitness certificate expires (hypothetical)" },
   { value: "crews_absent", label: "Cleaning crews are absent" },
   { value: "critical_job", label: "A critical fault is reported" },
   { value: "required_revenue", label: "Change the number of revenue trains" },
@@ -69,11 +69,15 @@ export default function Simulator() {
         <label className="text-sm md:col-span-3">
           Scenario
           <select className={field} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-            {KINDS.map((k) => (
-              <option key={k.value} value={k.value}>
-                {k.label}
-              </option>
-            ))}
+            {KINDS.map((k) => {
+              const noCleaning = k.value === "crews_absent" && !fleet.inputs_loaded.cleaning;
+              return (
+                <option key={k.value} value={k.value} disabled={noCleaning}>
+                  {k.label}
+                  {noCleaning ? " (needs cleaning data)" : ""}
+                </option>
+              );
+            })}
           </select>
         </label>
         {needsTrain && (

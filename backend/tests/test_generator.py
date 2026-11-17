@@ -1,4 +1,4 @@
-from generator import generate
+from fixture_data import generate
 
 
 def test_deterministic():

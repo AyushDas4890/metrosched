@@ -14,14 +14,23 @@ def apply_scenario(snap: FleetSnapshot, scenario: dict) -> FleetSnapshot:
     kind = scenario["type"]
     if kind == "cert_expire":
         tid = scenario["train_id"]
+        s.train(tid)
         cert_kind = scenario.get("kind", "ROLLING_STOCK")
-        for c in s.certificates.get(tid, []):
+        expired = (s.service_date - timedelta(days=1)).isoformat()
+        certs = s.certificates.setdefault(tid, [])
+        for c in certs:
             if c["kind"] == cert_kind:
-                c["valid_until"] = (s.service_date - timedelta(days=1)).isoformat()
+                c["valid_until"] = expired
+        if not any(c["kind"] == cert_kind for c in certs):
+            # Hypothetical: no certificate data is loaded, so the scenario adds an expired one for this train only.
+            certs.append({"train_id": tid, "kind": cert_kind, "valid_until": expired})
     elif kind == "crews_absent":
+        if not s.available["cleaning"]:
+            raise ValueError("no cleaning data loaded, so cleaning crews cannot be simulated")
         s.cleaning_slots = max(0, s.cleaning_slots - SLOTS_PER_CREW * int(scenario.get("count", 1)))
     elif kind == "critical_job":
         tid = scenario["train_id"]
+        s.train(tid)
         s.job_cards.setdefault(tid, []).append({
             "wonum": "WO-SIM", "assetnum": tid, "description": scenario.get("description", "Simulated critical fault"),
             "wopriority": "CRITICAL", "status": "OPEN", "reportdate": s.service_date.isoformat()})

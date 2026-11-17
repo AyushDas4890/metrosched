@@ -1,0 +1,11 @@
+{
+  "_about": "Operating parameters, not measured data. Fleet size and depot are public KMRL facts; the counts below are planning assumptions (docs/ASSUMPTIONS.md). Change them here.",
+  "n_trains": 25,
+  "depot": "Muttom",
+  "service_date": null,
+  "required_revenue": 18,
+  "min_standby": 2,
+  "ibl_capacity": 6,
+  "cleaning_slots": null,
+  "cleaning_due_days": 3
+}

@@ -49,13 +49,13 @@
 <!-- COVER -->
 <section class="cover">
   <div>
-    <p><span class="plate">TS-07</span> <span class="plate">TS-12</span> <span class="plate" style="background:var(--stb)">TS-20</span> <span class="plate" style="background:var(--ibl)">TS-15</span></p>
+    <p><span class="plate">TS-08</span> <span class="plate">TS-11</span> <span class="plate" style="background:var(--stb)">TS-22</span> <span class="plate" style="background:var(--ibl)">TS-21</span></p>
     <h1>MetroSched, explained</h1>
     <p class="lead" style="font-size:15pt;margin-top:8pt">A complete guide to understanding and rebuilding the nightly train-induction planner for Kochi Metro (SIH25081)</p>
   </div>
   <div>
-    <p><strong>CSE 471 class project.</strong> Every number, file name, command and output in this guide was taken from the project repository (commit <code>506c107</code>) or produced by running its code on 16–17 November 2026. The production build (<code>next build</code>) was last run on 17 November 2026.</p>
-    <div class="warn"><strong>Per-train planning data is synthetic.</strong> Certificates, job cards, branding contracts, mileage and bay positions come from a seeded generator. They are not real KMRL figures. <strong>The compressor sensor data is real</strong>: the MetroPT-3 dataset from a Metro do Porto train (Section 8b). Network-level facts and every assumed value are listed in <code>docs/ASSUMPTIONS.md</code> (Section 4).</div>
+    <p><strong>CSE 471 class project.</strong> Every number, file name, command and output in this guide was taken from the project repository or produced by running its code on 17 November 2026.</p>
+    <div class="warn"><strong>No synthetic data.</strong> MetroSched plans from real data only: the MetroPT-3 air-compressor dataset (Metro do Porto, 2020, CC BY 4.0), public KMRL facts (25 trainsets, Muttom depot), and any real files you upload. Certificates, job cards, branding, mileage, cleaning and bay positions have no public source, so they start <em>not loaded</em> and the rules that need them are reported as not checked (Section 4). MetroPT-3 covers one train; the 25-train fleet is an arrangement of its readings.</div>
   </div>
 </section>
 
@@ -73,6 +73,7 @@
   <li><a href="#s7">What-if simulation</a></li>
   <li><a href="#s8">Override learning</a></li>
   <li style="list-style:none;margin-left:-16pt"><a href="#s8b">8b. Real data: compressor fault risk from MetroPT-3</a></li>
+  <li style="list-style:none;margin-left:-16pt"><a href="#s8c">8c. Knowledge base: retrieval (RAG without generation)</a></li>
   <li value="9"><a href="#s9">API reference</a></li>
   <li><a href="#s10">Database schema</a></li>
   <li><a href="#s11">Frontend</a></li>
@@ -87,107 +88,45 @@
 <!-- 0 -->
 <h1 id="s0">Overview: what MetroSched is and how it is used</h1>
 <h2>What it is</h2>
-<p class="lead">MetroSched is a decision-support web application for a metro rail depot. Every night it decides which trains will run passenger service the next morning, which stay on standby, and which go for inspection or maintenance. It explains every decision in plain language.</p>
-<p>It is a CSE 471 class project built on the Smart India Hackathon problem SIH25081, set by Kochi Metro Rail Limited (KMRL). In one sentence: <strong>it turns a slow, manual, spreadsheet-and-WhatsApp process into an optimised plan computed in a few hundredths of a second that a supervisor can read, question, simulate and override.</strong></p>
+<p class="lead">MetroSched is a decision-support web application for a metro rail depot. Every night it decides which trains run passenger service the next morning, which stay on standby, and which go for inspection or maintenance, and it explains every decision in plain language.</p>
+<p>It is a CSE 471 class project built on the Smart India Hackathon problem SIH25081 (Kochi Metro Rail Limited). It uses <strong>no synthetic data</strong>: it scores every train on real air-compressor sensor readings (MetroPT-3) and plans with Google OR-Tools in a few hundredths of a second. Inputs that have no real public source are clearly shown as not loaded, and can be added by uploading real files.</p>
 <table>
 <tr><th style="width:28%">Part</th><th>What it does for the user</th></tr>
-<tr><td>Planner</td><td>Produces a ranked list of all trainsets, each marked <span class="tag rev">REVENUE</span>, <span class="tag stb">STANDBY</span> or <span class="tag ibl">IBL</span>, while never breaking a safety rule.</td></tr>
-<tr><td>Explanations</td><td>Tells the supervisor <em>why</em> each train got its assignment, and flags conflicts to check.</td></tr>
-<tr><td>What-if simulator</td><td>Shows what would change if something goes wrong, before it happens.</td></tr>
-<tr><td>Compressor fault risk (real data)</td><td>Scores each train's air compressor from real Metro do Porto sensor readings (MetroPT-3) and flags trains at risk of an air leak.</td></tr>
-<tr><td>Override log and learning</td><td>Lets a supervisor overrule the plan with a reason, keeps an audit record, and learns from repeated overrides.</td></tr>
-<tr><td>Dashboard</td><td>Six pages: tonight's plan, fleet health, mileage and branding, depot bay map, simulator, override log.</td></tr>
-<tr><td>Story page</td><td>A scroll-driven 3D walkthrough that explains the system to newcomers.</td></tr>
+<tr><td>Planner</td><td>A ranked list of all 25 trainsets, each <span class="tag rev">REVENUE</span>, <span class="tag stb">STANDBY</span> or <span class="tag ibl">IBL</span>, never breaking a rule whose data is loaded, and listing the rules it could not check.</td></tr>
+<tr><td>Explanations</td><td>Why each train got its assignment, in plain language, plus alerts to check by hand.</td></tr>
+<tr><td>Compressor health (real data)</td><td>Fault risk, minutes below 7 bar and loaded duty for each train, from real MetroPT-3 readings.</td></tr>
+<tr><td>What-if simulator</td><td>What would change if a fault is reported or the revenue requirement changes.</td></tr>
+<tr><td>Knowledge base</td><td>The real MetroPT-3 failure reports and sensor documentation behind each alert, with sources.</td></tr>
+<tr><td>Overrides and learning</td><td>A supervisor overrules with a reason; it is logged and, after 20, re-weights the goals.</td></tr>
 </table>
-
 <h2>Who uses it</h2>
 <table>
-<tr><th style="width:28%">User</th><th>What they need from MetroSched</th></tr>
-<tr><td>Depot supervisor (main user)</td><td>Tonight's induction plan, fast, with reasons they can defend, and the power to overrule it.</td></tr>
-<tr><td>Maintenance / rolling-stock engineer</td><td>Which trains are blocked by expired certificates or critical job cards, and which fit trains can take a maintenance slot.</td></tr>
-<tr><td>Commercial / branding team</td><td>Whether advertiser-wrapped trains are getting their contracted exposure hours.</td></tr>
-<tr><td>Operations manager or auditor</td><td>A record of every plan and every override, with reasons, after the fact.</td></tr>
-<tr><td>Students and examiners (this project)</td><td>A working, testable example of constraint optimisation with explainable results.</td></tr>
+<tr><th style="width:28%">User</th><th>What they need</th></tr>
+<tr><td>Depot supervisor (main user)</td><td>Tonight's plan, fast, with reasons and the power to overrule it.</td></tr>
+<tr><td>Maintenance / rolling-stock engineer</td><td>Which compressors look likely to fail or are losing pressure, and the evidence.</td></tr>
+<tr><td>Operations manager or auditor</td><td>Every plan and override, and which rules each plan could not check.</td></tr>
+<tr><td>Students and examiners</td><td>A working example of constraint optimisation and machine learning on real railway data.</td></tr>
 </table>
-
 <h2>Use cases</h2>
-<p>Each use case below is something the built application actually does today, with the page or endpoint that does it.</p>
-
-<h3>1. Plan tonight's induction (the core use case)</h3>
-<p><strong>Situation:</strong> It is 21:00 and the supervisor must decide tomorrow's service for 25 trains.</p>
-<ol>
-  <li>Open <em>Tonight's plan</em> and select <em>Generate plan</em>.</li>
-  <li>MetroSched returns 18 Revenue, 2 Standby and 5 IBL trains in well under a second, ranked, each with reasons.</li>
-  <li>The supervisor reads the alerts, for example "Shunting needed: TS-01 block exit from D1-L1-P7", and acts on them.</li>
-</ol>
-<p><strong>Value:</strong> the plan is computed in under a second, and an expired certificate or critical fault can never slip into service.</p>
-
-<h3>2. React to a late fault or expiring certificate</h3>
-<p><strong>Situation:</strong> At 22:30 a technician reports a critical bogie alarm on TS-22, which was planned for service.</p>
-<ol>
-  <li>Open the <em>What-if simulator</em>, choose "A critical fault is reported" and TS-22.</li>
-  <li>The result shows exactly what changes: TS-22 moves to IBL, TS-04 comes off standby into revenue to keep 18 trains running, and TS-21 moves from IBL to standby, because 18 revenue + 2 standby now needs every fit train (Section 7).</li>
-</ol>
-<p><strong>Value:</strong> the replacement is chosen by the same rules, not by guesswork under time pressure.</p>
-
-<h3>3. Plan around staff shortages</h3>
-<p><strong>Situation:</strong> One cleaning crew calls in sick.</p>
-<ol>
-  <li>Simulate "Cleaning crews are absent", count 1.</li>
-  <li>MetroSched answers that no valid plan exists and states the smallest fix of size 2: "Relax required revenue by 2" (finding two more cleaning slots would cost the same). The supervisor now knows to run two fewer trains or find two more cleaning slots.</li>
-</ol>
-<p><strong>Value:</strong> an impossible situation is named clearly instead of producing an unsafe plan.</p>
-
-<h3>4. Keep advertisers' contracts on track</h3>
-<p><strong>Situation:</strong> A wrapped train is 20 hours behind its contracted exposure.</p>
-<p>The optimizer penalises keeping wrapped trains out of service, so they are pulled into revenue (TS-07 and TS-22, both 20 hours short, rank first and second). The <em>Mileage &amp; branding</em> page shows each train's shortfall, and an alert appears when a wrapped train is held back.</p>
-
-<h3>5. Even out wear across the fleet</h3>
-<p>Trains with mileage below the fleet mean are preferred for service. The <em>Mileage &amp; branding</em> page shows each train's distance from the mean, so engineers can see the fleet staying balanced over time.</p>
-
-<h3>6. Check fleet health before planning</h3>
-<p>The <em>Fleet health</em> page shows how many days each train has before its earliest certificate expires, and every open Maximo job card with critical ones first. Engineers use it to schedule renewals before they block service.</p>
-
-<h3>7. Minimise shunting at the depot</h3>
-<p>The <em>Depot bay map</em> shows each stabling line, where every train is parked and its assignment, and lists the shunting moves needed before morning turn-out.</p>
-
-<h3>8. Overrule the plan, with an audit trail</h3>
-<p><strong>Situation:</strong> A special event needs TS-04 in service, although the plan held it on standby.</p>
-<ol>
-  <li>Expand TS-04 on <em>Tonight's plan</em>, choose "Move to Revenue", enter a reason and save.</li>
-  <li>The override is stored with the time, the reason and the train's features, and appears on the <em>Override log</em>. Trains that are unfit cannot be moved out of IBL.</li>
-  <li>After 20 overrides, MetroSched re-weights its goals to match the supervisors' preferences (Section 8).</li>
-</ol>
-<p>Note: an override is recorded but the plan is not re-solved around it (see Section 14).</p>
-
-<h3>9. Catch compressor trouble before it strands a train</h3>
-<p><strong>Situation:</strong> A train's air compressor is starting to leak, which in the real MetroPT-3 data led to low-pressure warnings.</p>
-<p>Each train carries a 12-hour slice of real compressor readings. TS-21's slice contains the reported 29–30 May 2020 air leak; the model scores it 94%, raises an alert and the optimizer keeps TS-21 out of revenue. The <em>Fleet health</em> page charts every train's risk (Section 8b).</p>
-
-<h3>10. Load real data instead of the demo data</h3>
-<p>Upload CSV or JSON files (for example a Maximo <code>job_cards.csv</code> export) through <code>POST /data/ingest</code>, then generate a plan the same way. The demo ships with synthetic data only.</p>
-
-<h3>11. Explain the system to someone new</h3>
-<p>The <em>/story</em> page walks a newcomer through one night at the depot in 3D: trains arrive, unfit ones roll to the inspection bay, and the first train leaves on time.</p>
-
-<h2>A typical night with MetroSched</h2>
-<table>
-<tr><th style="width:16%">Time</th><th>What happens</th></tr>
-<tr><td>Afternoon</td><td>Latest certificates, Maximo job cards and branding data are loaded (<code>/data/ingest</code>).</td></tr>
-<tr><td>21:00</td><td>Supervisor generates the plan and reviews reasons and alerts.</td></tr>
-<tr><td>21:15</td><td>Engineers check <em>Fleet health</em>; any trains due for renewal are noted.</td></tr>
-<tr><td>22:30</td><td>A late fault comes in; the supervisor runs a what-if and regenerates the plan.</td></tr>
-<tr><td>23:00</td><td>Final plan is fixed; any overrides are logged with reasons.</td></tr>
-<tr><td>Next day</td><td>Managers can look back at <em>plan history</em> and the <em>override log</em>.</td></tr>
-</table>
-<p>This timeline is illustrative: it shows how the existing features fit together, not a measured KMRL workflow.</p>
-
+<h3>1. Plan tonight's induction</h3>
+<p>Open <em>Tonight's plan</em> and select <em>Generate plan</em>. MetroSched returns 18 Revenue, 3 Standby and 4 IBL trains, ranked, each with reasons. A note above the list says which hard rules were not checked because their data is not loaded.</p>
+<h3>2. Catch compressor trouble before it strands a train</h3>
+<p>TS-21's slice contains the real 29–30 May 2020 air leak: risk 94%, so it goes to IBL with an alert. TS-03's slice contains the real 15 July leak, which the risk model missed (4%), but its air pressure was below 7 bar for 89 minutes, so it also goes to IBL. The <em>Fleet health</em> and <em>Compressor usage</em> pages show the evidence.</p>
+<h3>3. React to a late fault</h3>
+<p>Simulate "A critical fault is reported" on TS-12: TS-12 moves to IBL and TS-22 comes off standby into revenue (Section 7).</p>
+<h3>4. Change the service level</h3>
+<p>Simulate "16 revenue trains needed": TS-14 (16.9 min below 7 bar) moves to IBL and TS-16 to standby.</p>
+<h3>5. Look up the evidence</h3>
+<p>Expanding a train shows the matching real documents, for example the MetroPT-3 description of the LPS low-pressure signal for a train with a pressure alert. The <em>Knowledge base</em> page searches them directly.</p>
+<h3>6. Overrule the plan, with an audit trail</h3>
+<p>Expand a train, choose a new assignment, give a reason and save. The override is logged with the train's features and appears on the <em>Override log</em>.</p>
+<h3>7. Add real depot data</h3>
+<p>Upload real certificates, Maximo job cards, mileage or bay positions through <code>POST /data/ingest</code>. The matching rules and pages switch on automatically; <code>GET /data/status</code> shows what is loaded.</p>
 <h2>What it is not</h2>
 <ul>
-  <li><strong>Not connected to real KMRL systems.</strong> Planning data is synthetic; there is no live link to Maximo or certificate systems. The one real dataset (MetroPT-3) comes from a Porto train, not a Kochi one.</li>
-  <li><strong>Not deployed.</strong> It runs locally on one computer; there are no user accounts or login.</li>
-  <li><strong>Not a replacement for the supervisor.</strong> It recommends and explains; a person makes the final call.</li>
-  <li><strong>Not a timetable or crew roster.</strong> It decides which trains run, not when each one runs or who drives it.</li>
+  <li><strong>Not connected to real KMRL systems.</strong> MetroPT-3 comes from a Porto train, not a Kochi one, and no KMRL operational data is published.</li>
+  <li><strong>Not a complete check without uploads.</strong> Certificates, critical job cards and cleaning capacity are not checked until real data is loaded.</li>
+  <li><strong>Not deployed</strong> and <strong>not a replacement for the supervisor</strong>: it recommends and explains; a person decides.</li>
 </ul>
 
 <!-- 1 -->
@@ -221,12 +160,12 @@
 
 <!-- 2 -->
 <h1 id="s2"><span class="num">2</span>System overview</h1>
-<p class="lead">Four parts: a data generator, a Python backend (API, optimizer, learner, database), and a Next.js frontend.</p>
+<p class="lead">Three parts: real data (MetroPT-3, plus any uploads), a Python backend (API, optimizer, risk model, retrieval, learner, database), and a Next.js frontend.</p>
 <figure>
 <svg viewBox="0 0 720 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="12">
   <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4f626b"/></marker></defs>
-  <rect x="10" y="20" width="150" height="60" rx="8" fill="#eef6f9" stroke="#0f7fa8"/><text x="85" y="45" text-anchor="middle" font-weight="600">data/generator.py</text><text x="85" y="62" text-anchor="middle" fill="#4f626b">seeded synthetic data</text>
-  <rect x="10" y="110" width="150" height="60" rx="8" fill="#eef6f9" stroke="#0f7fa8"/><text x="85" y="135" text-anchor="middle" font-weight="600">CSV / JSON uploads</text><text x="85" y="152" text-anchor="middle" fill="#4f626b">e.g. Maximo job cards</text>
+  <rect x="10" y="20" width="150" height="60" rx="8" fill="#eef6f9" stroke="#0f7fa8"/><text x="85" y="45" text-anchor="middle" font-weight="600">MetroPT-3 (real)</text><text x="85" y="62" text-anchor="middle" fill="#4f626b">compressor sensor windows</text>
+  <rect x="10" y="110" width="150" height="60" rx="8" fill="#eef6f9" stroke="#0f7fa8"/><text x="85" y="135" text-anchor="middle" font-weight="600">Real uploads (optional)</text><text x="85" y="152" text-anchor="middle" fill="#4f626b">e.g. Maximo job cards</text>
   <rect x="210" y="10" width="300" height="280" rx="10" fill="#fff" stroke="#13262f"/><text x="360" y="32" text-anchor="middle" font-weight="700">FastAPI backend (backend/)</text>
   <rect x="230" y="50" width="120" height="50" rx="6" fill="#f3f6f7" stroke="#d3dde1"/><text x="290" y="73" text-anchor="middle" font-weight="600">app/main.py</text><text x="290" y="89" text-anchor="middle" fill="#4f626b">HTTP routes</text>
   <rect x="370" y="50" width="120" height="50" rx="6" fill="#f3f6f7" stroke="#d3dde1"/><text x="430" y="73" text-anchor="middle" font-weight="600">SQLite</text><text x="430" y="89" text-anchor="middle" fill="#4f626b">via SQLAlchemy</text>
@@ -235,7 +174,7 @@
   <rect x="230" y="220" width="120" height="55" rx="6" fill="#f3f6f7" stroke="#d3dde1"/><text x="290" y="243" text-anchor="middle" font-weight="600">ml/learner.py</text><text x="290" y="260" text-anchor="middle" fill="#4f626b">override learning</text>
   <rect x="370" y="220" width="120" height="55" rx="6" fill="#f3f6f7" stroke="#d3dde1"/><text x="430" y="243" text-anchor="middle" font-weight="600">simulate.py</text><text x="430" y="260" text-anchor="middle" fill="#4f626b">what-if + diff</text>
   <rect x="560" y="110" width="150" height="80" rx="8" fill="#13262f"/><text x="635" y="140" text-anchor="middle" font-weight="700" fill="#fff">Next.js dashboard</text><text x="635" y="158" text-anchor="middle" fill="#c9d6dc">frontend/</text><text x="635" y="174" text-anchor="middle" fill="#c9d6dc">localhost:3000</text>
-  <line x1="160" y1="50" x2="228" y2="70" stroke="#4f626b" marker-end="url(#a)"/><text x="120" y="15" fill="#4f626b" font-size="10">POST /data/seed</text>
+  <line x1="160" y1="50" x2="228" y2="70" stroke="#4f626b" marker-end="url(#a)"/><text x="120" y="15" fill="#4f626b" font-size="10">read per request</text>
   <line x1="160" y1="140" x2="228" y2="85" stroke="#4f626b" marker-end="url(#a)"/><text x="40" y="190" fill="#4f626b" font-size="10">POST /data/ingest</text>
   <line x1="350" y1="75" x2="368" y2="75" stroke="#4f626b" marker-end="url(#a)"/>
   <line x1="290" y1="100" x2="290" y2="128" stroke="#4f626b" marker-end="url(#a)"/>
@@ -247,10 +186,10 @@
 </figure>
 <h2>One night, end to end</h2>
 <ol>
-  <li><strong>Load data.</strong> <code>POST /data/seed</code> (synthetic) or <code>POST /data/ingest</code> (your own CSV/JSON files) fills the SQLite tables.</li>
-  <li><strong>Build a snapshot.</strong> The API reads all tables into a <code>FleetSnapshot</code>, an in-memory object the optimizer understands.</li>
+  <li><strong>Fleet.</strong> If real files were uploaded (<code>POST /data/ingest</code>), they are used. Otherwise <code>app/metropt_fleet.py</code> builds 25 trainsets at Muttom with no planning inputs.</li>
+  <li><strong>Build a snapshot.</strong> Each train gets its MetroPT-3 slice (risk, minutes below 7 bar, duty). The <code>FleetSnapshot</code> records which inputs are loaded.</li>
   <li><strong>Pick weights.</strong> The learner looks at logged overrides. Fewer than 20 → default weights; otherwise learned weights.</li>
-  <li><strong>Solve.</strong> The CP-SAT model assigns every train while obeying all hard rules and minimising the weighted soft penalty.</li>
+  <li><strong>Solve.</strong> The CP-SAT model assigns every train, applying every hard rule whose data is loaded and minimising the weighted soft penalty. Rules without data are listed as not checked.</li>
   <li><strong>Explain and rank.</strong> <code>explain.py</code> writes reasons and alerts; trains are ranked Revenue → Standby → IBL, by score.</li>
   <li><strong>Store and show.</strong> The plan is saved (<code>plans</code>, <code>plan_items</code>) and returned to the dashboard.</li>
   <li><strong>Override.</strong> A supervisor may change a train's assignment with a reason; it is logged and feeds future weight learning.</li>
@@ -263,16 +202,16 @@
 <tr><th style="width:38%">Path</th><th>Purpose</th></tr>
 <tr><td><code>METROSCHED_SUPER_PROMPT.md</code></td><td>The original brief: stack, deliverables, constraints, approval gates.</td></tr>
 <tr><td><code>README.md</code></td><td>How to run, API table, what-if scenarios, tests, limitations.</td></tr>
-<tr><td><code>run.ps1</code></td><td>One-command runner: install, seed, start; <code>seed</code> and <code>test</code> tasks.</td></tr>
+<tr><td><code>run.ps1</code></td><td>One-command runner: install and start; <code>test</code> task. No seeding step.</td></tr>
 <tr><td><code>requirements.txt</code></td><td>Pinned Python packages (ortools 9.15, fastapi 0.162, pydantic 2.14, SQLAlchemy 2.1, scikit-learn 1.9, uvicorn, pytest, httpx, python-multipart).</td></tr>
 <tr><td><code>.env.example</code></td><td>Optional settings: <code>DATABASE_URL</code>, <code>CORS_ORIGINS</code>, <code>NEXT_PUBLIC_API_URL</code>.</td></tr>
-<tr><td><code>data/generator.py</code></td><td>Seeded synthetic data generator (Section 4).</td></tr>
-<tr><td><code>data/seed/</code></td><td>Generated files: <code>config.json</code>, <code>depots.json</code>, <code>bays.json</code>, <code>trainsets.json</code>, <code>certificates.json</code>, <code>job_cards.csv</code>, <code>branding.json</code>.</td></tr>
+<tr><td><code>data/fleet_config.json</code></td><td>Operating parameters (fleet size, depot, required revenue, minimum standby, IBL bays): assumptions, not data.</td></tr>
 <tr><td><code>backend/app/db.py</code></td><td>SQLAlchemy engine and session factory; default DB <code>backend/metrosched.db</code>.</td></tr>
 <tr><td><code>backend/app/models.py</code></td><td>Database tables (Section 10).</td></tr>
 <tr><td><code>backend/app/schemas.py</code></td><td>Pydantic request/response models.</td></tr>
 <tr><td><code>backend/app/repo.py</code></td><td>Ingest (replace tables), CSV parsing, load the dataset back.</td></tr>
 <tr><td><code>backend/app/main.py</code></td><td>FastAPI app factory <code>create_app()</code> and all routes.</td></tr>
+<tr><td><code>backend/app/metropt_fleet.py</code></td><td>The default real-data fleet: 25 trainsets with no invented inputs.</td></tr>
 <tr><td><code>backend/optimizer/snapshot.py</code></td><td><code>FleetSnapshot</code>: in-memory view of one night's data.</td></tr>
 <tr><td><code>backend/optimizer/constraints.py</code></td><td>Pure hard-rule checks and the independent plan checker.</td></tr>
 <tr><td><code>backend/optimizer/model.py</code></td><td>The CP-SAT model, scoring, ranking, relaxation report.</td></tr>
@@ -280,50 +219,59 @@
 <tr><td><code>backend/optimizer/simulate.py</code></td><td>What-if scenarios and plan diffs.</td></tr>
 <tr><td><code>backend/ml/learner.py</code></td><td>Learns soft weights from overrides.</td></tr>
 <tr><td><code>backend/ml/apu_risk.py</code></td><td>Compressor fault-risk model on real MetroPT-3 data; maps sensor slices onto trainsets.</td></tr>
+<tr><td><code>backend/rag/kb.py</code></td><td>Retrieval-only knowledge base: chunking, TF-IDF index, cosine ranking, per-train issue lookup.</td></tr>
+<tr><td><code>data/kb/</code></td><td><code>metropt3_failures.md</code> and <code>metropt3_signals.md</code> (both real). An optional real <code>work_orders.csv</code> can be added.</td></tr>
 <tr><td><code>data/metropt3/</code></td><td><code>prepare.py</code> plus the prepared <code>windows.csv</code> and <code>window_risk.csv</code> (the 208 MB raw download is not committed).</td></tr>
-<tr><td><code>backend/tests/</code></td><td>28 pytest tests (Section 12).</td></tr>
+<tr><td><code>backend/tests/</code></td><td>39 pytest tests (Section 12) and <code>fixture_data.py</code>, an invented fleet used by tests only.</td></tr>
 <tr><td><code>frontend/app/(desk)/</code></td><td>Dashboard pages that share the sidebar layout.</td></tr>
 <tr><td><code>frontend/app/story/</code></td><td>The GSAP 3D story page and its CSS.</td></tr>
 <tr><td><code>frontend/components/</code></td><td>Sidebar, logo, train plate, badges, shadcn/ui and React Bits components.</td></tr>
 <tr><td><code>frontend/lib/</code></td><td>API client, types, formatting helpers, motion presets, chart styling, fleet hook.</td></tr>
 <tr><td><code>frontend/tests/</code></td><td>Vitest unit tests and the Playwright smoke test.</td></tr>
 <tr><td><code>docs/</code></td><td>ARCHITECTURE, PLAN, ASSUMPTIONS, USER_GUIDE, DESIGN_CRITIQUE, this guide.</td></tr>
-<tr><td><code>presentation/</code></td><td><code>build_deck.js</code> and the 10-slide <code>MetroSched.pptx</code>.</td></tr>
+<tr><td><code>presentation/</code></td><td><code>build_deck.js</code> and the 12-slide <code>MetroSched.pptx</code>.</td></tr>
 </table>
 
 <!-- 4 -->
 <h1 id="s4"><span class="num">4</span>Data</h1>
-<div class="warn"><strong>Everything per-train is synthetic.</strong> KMRL does not publish certificate dates, job cards or branding contracts for individual trains, so the generator invents realistic-looking values from a fixed random seed.</div>
-<p><code>data/generator.py</code> exposes <code>generate(n_trains=25, n_depots=1, seed=471)</code>. The same seed always gives the same data (a test checks this). Service date is fixed at <code>2026-11-01</code>.</p>
-<pre><code>python data/generator.py                                   # 25 trains, 1 depot  -> data/seed/
-python data/generator.py --trains 40 --depots 2 --out data/seed40</code></pre>
-<h2>Entities and fields</h2>
+<div class="warn"><strong>No synthetic data.</strong> Every value the app plans from is real, or is an operating parameter labelled as an assumption. Inputs without a real source are left empty, never invented.</div>
+<h2>What is real</h2>
 <table>
-<tr><th>Entity</th><th>Fields</th><th>How values are generated</th></tr>
-<tr><td>depots</td><td>depot_id, name</td><td>D1 "Muttom", D2 "Depot-B" (scale test only).</td></tr>
-<tr><td>bays</td><td>bay_id, depot_id, line, position, kind</td><td>3 stabling lines per depot, depth = ceil(trains/3) (9 for 25 trains), plus 6 IBL bays. Position 1 is nearest the exit. 25 trains → 27 + 6 = 33 bays.</td></tr>
-<tr><td>trainsets</td><td>train_id, depot_id, cars, cumulative_km, bay_id, days_since_cleaning</td><td>IDs TS-01…; cars = 3; km uniform 180,000–260,000; cleaning 0–5 days ago; each train is placed in a random stabling bay.</td></tr>
-<tr><td>certificates</td><td>train_id, kind, valid_until</td><td>3 per train. Validity RS 30 d, Signalling 60 d, Telecom 90 d. About 6% get an offset that can fall before the service date (expired).</td></tr>
-<tr><td>job_cards (CSV)</td><td>wonum, assetnum, description, wopriority, status, reportdate</td><td>Maximo-style columns. 0–3 per train from a list of 7 faults; CRITICAL cards are OPEN with probability 0.35, others 0.6.</td></tr>
-<tr><td>branding</td><td>contract_id, train_id, advertiser, min_hours_per_day, hours_shortfall_7d</td><td>One third of trains (8 of 25); minimum 8/10/12/14 h; shortfall 0–20 h.</td></tr>
-<tr><td>config</td><td>service_date, required_revenue, min_standby, cleaning_slots, ibl_capacity, cleaning_due_days</td><td>required_revenue = round(0.72 × trains) = 18; min_standby = max(2, trains // 12) = 2; cleaning_slots = 6 per depot; ibl_capacity = 6 per depot; cleaning due after 3 days.</td></tr>
+<tr><th>Data</th><th>Source</th><th>Used for</th></tr>
+<tr><td>Air-compressor sensors, 1,516,948 rows, 15 signals, Feb–Aug 2020</td><td>MetroPT-3 (UCI, doi:10.24432/C5VW3R, CC BY 4.0)</td><td>Fault risk, minutes below 7 bar, loaded duty per train</td></tr>
+<tr><td>Four reported air leaks</td><td>Same dataset page</td><td>Training labels; knowledge base</td></tr>
+<tr><td>Sensor documentation</td><td>Same dataset page</td><td>Knowledge base</td></tr>
+<tr><td>25 trainsets, Muttom depot</td><td>Public KMRL facts</td><td>Fleet size and depot</td></tr>
+<tr><td>Uploaded files</td><td>You (<code>POST /data/ingest</code>)</td><td>Certificates, job cards, branding, mileage, cleaning, bays</td></tr>
 </table>
-<p>Seeding the 25-train dataset loads (real output):</p>
-<pre><code>{'config': 6, 'depots': 1, 'bays': 33, 'trainsets': 25, 'certificates': 75, 'job_cards': 41, 'branding': 8}</code></pre>
-<div class="note">One input is real: compressor sensor data from MetroPT-3, covered in Section 8b.</div>
-<h2>Assumptions (from docs/ASSUMPTIONS.md)</h2>
+<h2>What is not loaded, and what that means</h2>
+<p><code>FleetSnapshot.available</code> records whether each input has data. Real output of <code>GET /data/status</code> with no uploads:</p>
+<pre><code>{"data_source": "metropt3",
+ "inputs_loaded": {"certificates": false, "job_cards": false, "branding": false, "mileage": false,
+                   "cleaning": false, "bays": false, "compressor": true},
+ "rules_not_checked": ["Fitness certificates valid (no certificate data loaded)",
+                       "No open critical job card (no job-card data loaded)",
+                       "Cleaning-slot capacity (no cleaning data loaded)"],
+ "goals_not_used": ["Branding exposure (no branding data loaded)", "Mileage balancing (no mileage data loaded)",
+                    "Shunting / stabling geometry (no bay data loaded)"]}</code></pre>
+<p>A rule with no data is skipped in the solver <em>and</em> in the independent checker, and named on every plan. No train is called "fit" unless certificate and job-card data were checked; <code>/fleet/status</code> returns <code>"fit": null</code> instead.</p>
+<h2>From one real train to a fleet</h2>
+<p>MetroPT-3 has one train. <code>assign_slices()</code> gives each of the 25 trainsets a seeded slice of 24 consecutive logged 30-minute windows (12 h of logged data). Three trainsets get a slice overlapping a reported failure; the rest get slices at least a day away from any failure. <strong>This mapping is an assumption</strong>; the readings themselves are real. Each slice yields:</p>
 <table>
-<tr><th>Item</th><th>Assumed value</th></tr>
-<tr><td>Revenue trains required per morning</td><td>18 (25-train fleet)</td></tr>
-<tr><td>Minimum standby</td><td>2</td></tr>
-<tr><td>IBL bay capacity</td><td>6 per depot</td></tr>
-<tr><td>Cleaning slots per night</td><td>6 (2 crews × 3 slots)</td></tr>
-<tr><td>Certificate validity windows</td><td>RS 30 d, Signalling 60 d, Telecom 90 d</td></tr>
-<tr><td>Branding contract minimum</td><td>8–14 h/day exposure</td></tr>
-<tr><td>Cleaning due</td><td>every 3 days</td></tr>
-<tr><td>Depot layout</td><td>3 stabling lines × 9 deep + 6 IBL bays</td></tr>
+<tr><th>Statistic</th><th>Signal</th><th>Range across the 25 trains</th></tr>
+<tr><td>Fault risk</td><td>Random-forest score, peak window (Section 8b)</td><td>0% – 94%</td></tr>
+<tr><td>Compressor duty</td><td>DV electric (on while loaded), mean share</td><td>5% – 79%</td></tr>
+<tr><td>Minutes below 7 bar</td><td>LPS, summed over the slice</td><td>0 in 16 trains; up to 89 min</td></tr>
 </table>
-<p>Public facts used: KMRL runs 25 Alstom Metropolis trainsets on the Aluva–Tripunithura line (about 28 km) from Muttom depot. Real KMRL trainsets are <strong>3-car</strong>; the SIH25081 statement says four-car. The model does not depend on car count. The ASSUMPTIONS file itself says to verify these facts before quoting them.</p>
+<h2>Assumptions (docs/ASSUMPTIONS.md, data/fleet_config.json)</h2>
+<table>
+<tr><th>Item</th><th>Value</th></tr>
+<tr><td>Revenue trains required / minimum standby / IBL bays</td><td>18 / 2 / 6</td></tr>
+<tr><td>Compressor alert level</td><td>Risk ≥ 50%</td></tr>
+<tr><td>Slice per train</td><td>24 logged half-hours, seed 471</td></tr>
+<tr><td>Oil-level signal</td><td>Not used (reads active in normal operation, the opposite of its documented meaning)</td></tr>
+</table>
+<p>Tests that need certificates, job cards and bays use <code>backend/tests/fixture_data.py</code>, an invented fleet that is never loaded by the app.</p>
 
 <!-- 5 -->
 <h1 id="s5"><span class="num">5</span>The optimizer, step by step</h1>
@@ -352,16 +300,19 @@ m.add(sum(x[t, REVENUE] for t in due) <= snap.cleaning_slots + slack_var("cleani
 <tr><td>6. Cleaning capacity</td><td>Revenue trains that are due for cleaning each need a slot; at most 6.</td></tr>
 </table>
 <p>In a normal solve, <code>slack_var()</code> returns 0, so these are strict. It only creates real slack variables in relaxation mode (5.6).</p>
+<div class="note"><strong>Rules without data.</strong> Rule 2 only fires on loaded certificate or job-card data (<code>missing_certificates()</code> returns nothing when no certificates are loaded), and rule 6 is added only when cleaning data is loaded. With MetroPT-3 data alone, rules 1, 3, 4 and 5 are enforced and rules 2 and 6 are listed as not checked.</div>
 <h2>5.3 Soft objective</h2>
-<p>CP-SAT works with integers, so each term is scaled to an integer. The solver <strong>minimises</strong> the sum. Default weights (<code>DEFAULT_WEIGHTS</code>): branding 10, mileage 2, shunting 5, standby 3, maintenance 4, compressor risk 500.</p>
+<p>CP-SAT works with integers, so each term is scaled to an integer. The solver <strong>minimises</strong> the sum. Default weights (<code>DEFAULT_WEIGHTS</code>): branding 10, mileage 2, shunting 5, standby 3, maintenance 4, compressor risk 500, low pressure 5, compressor duty 2. Terms whose input is not loaded (branding, mileage, shunting) are simply left out.</p>
 <table>
 <tr><th>Term</th><th>Formula (per train)</th><th>Effect</th></tr>
 <tr><td>Branding</td><td><code>int(w_branding × need) × (1 − x[t,REVENUE])</code>, need = min_hours + shortfall</td><td>Penalty if a wrapped train is not in revenue.</td></tr>
 <tr><td>Mileage</td><td><code>int(w_mileage × (km − mean_km)/1000) × x[t,REVENUE]</code></td><td>High-mileage trains cost more in revenue; below-mean trains reduce cost.</td></tr>
 <tr><td>Standby</td><td><code>−int(w_standby × 10) × x[t,STANDBY]</code></td><td>Reward for keeping a standby buffer.</td></tr>
-<tr><td>Maintenance</td><td><code>−int(w_maintenance × 10 × open_noncritical_jobs) × x[t,IBL]</code> (fit trains only)</td><td>Reward for using IBL slots on trains with open non-critical work.</td></tr>
+<tr><td>Maintenance</td><td><code>−int(w_maintenance × 10 × open_noncritical_jobs) × x[t,IBL]</code> (fit trains only)</td><td>Reward for using IBL slots on trains with open non-critical work <em>or real sensor alarms</em> (risk ≥ 50%, any minutes below 7 bar).</td></tr>
 <tr><td>Shunting</td><td><code>int(w_shunting × 10) × mv[t,u]</code></td><td>Penalty for each move needed to clear an exit path.</td></tr>
-<tr><td>Compressor risk</td><td><code>int(w_apu_risk × risk) × x[t,REVENUE]</code>, risk in [0, 1]</td><td>Penalty for running a train whose compressor looks likely to fail (Section 8b). Example: in a test on the seed, swapping TS-23 out of revenue cost the plan 359 points, so it left revenue at 95% risk with weight 500 but not with 200; the break-even risk depends on each train's replacement cost.</td></tr>
+<tr><td>Minutes below 7 bar</td><td><code>int(w_low_pressure × min(minutes, 60)) × x[t,REVENUE]</code></td><td>Penalty for running a train whose air pressure fell below 7 bar (LPS). Weight 5.</td></tr>
+<tr><td>Compressor duty</td><td><code>int(w_duty × (duty − mean_duty) × 100) × x[t,REVENUE]</code></td><td>Slight preference for compressors that ran loaded less than the fleet mean. Weight 2.</td></tr>
+<tr><td>Compressor risk</td><td><code>int(w_apu_risk × risk) × x[t,REVENUE]</code>, risk in [0, 1]</td><td>Penalty for running a train whose compressor looks likely to fail (Section 8b). Whether a high-risk train leaves revenue depends on what replacing it costs; on the MetroPT-3 fleet, both trains above 50% (TS-21, TS-09) go to IBL.</td></tr>
 </table>
 <h2>5.4 The shunting-pair idea</h2>
 <p>On a stabling line, position 1 is nearest the exit. If train <em>t</em> is at position 3 and train <em>u</em> at position 1 on the same line, then <em>t</em> cannot leave unless <em>u</em> also leaves. <code>shunt_pairs()</code> lists every (t, u) where u is between t and the exit (same depot, same line, lower position). For each pair:</p>
@@ -380,14 +331,12 @@ terms.append(int(weights["shunting"] * 10) * mv)</code></pre>
       - 100 if the train is unfit</code></pre>
 <p>Ranking sorts by assignment group (Revenue, then Standby, then IBL), then by score (highest first), then by train ID.</p>
 <h2>5.6 When no plan is possible: the relaxation report</h2>
-<p>If the strict model is infeasible, <code>_relaxation_report()</code> rebuilds it with slack variables on the four capacity rules, each costing 1,000,000 in the objective. The solver therefore relaxes as little as possible. The API returns <em>no plan</em>, only the list of relaxations. Certificate and job-card rules are <strong>never</strong> relaxed. Real example (one cleaning crew absent, Section 7):</p>
-<pre><code>[{'constraint': 'required_revenue', 'relax_by': 2, 'message': 'Relax required revenue by 2 to obtain a feasible plan'},
- {'constraint': 'info', 'relax_by': 0, 'message': '4 train(s) unfit (certificates / critical job cards are never relaxed)'}]</code></pre>
+<p>If the strict model is infeasible, <code>_relaxation_report()</code> rebuilds it with slack variables on the capacity rules, each costing 1,000,000 in the objective, so the solver relaxes as little as possible. The API returns <em>no plan</em>, only the list of relaxations, for example "Relax required revenue by 2 to obtain a feasible plan". Certificate and job-card rules are <strong>never</strong> relaxed.</p>
 <h2>5.7 Solver settings and an independent check</h2>
-<p>Time limit 8 s, <strong>1 worker thread</strong>. Plans for the seeded 25-train data solve in about 0.02 s; 40 trains / 2 depots in about 0.04 s on the build machine. A separate function, <code>check_plan()</code> in <code>constraints.py</code>, re-checks every hard rule without using the solver. The tests use it to prove that no generated plan violates a hard rule.</p>
-<div class="note"><strong>Why one worker thread.</strong> Sometimes two different plans have exactly the same objective. With 8 parallel workers, CP-SAT returned either one: in 40 solves of the seeded data, 1 run swapped TS-04 and TS-16 (both plans scored 287). That made the README's what-if diffs, and the test that checks them, flaky. With one worker, 30 of 30 solves gave the same plan on this machine and OR-Tools version, and solve time is unchanged at these sizes. The ties still exist; one worker just resolves them the same way each run.</div>
+<p>Time limit 8 s, <strong>1 worker thread</strong>. The 25-train MetroPT-3 fleet solves in about 0.005 s; the 40-train / 2-depot test fleet in about 0.04 s on the build machine. A separate function, <code>check_plan()</code> in <code>constraints.py</code>, re-checks every hard rule without using the solver. The tests use it to prove that no generated plan violates a hard rule.</p>
+<div class="note"><strong>Why one worker thread.</strong> Sometimes two different plans have exactly the same objective. With 8 parallel workers, CP-SAT returned either one: in 40 solves of an earlier test fleet, 1 run swapped two trains (both plans scored 287). That made the README's what-if diffs, and the test that checks them, flaky. With one worker, 30 of 30 solves gave the same plan on this machine and OR-Tools version, and solve time is unchanged at these sizes. The ties still exist; one worker just resolves them the same way each run.</div>
 <h2>5.8 Worked example by hand</h2>
-<p>Four trains, need 2 in revenue, at least 1 standby, IBL capacity 1, plenty of cleaning slots. Default weights. Mean km = 200,000. None are branded except B.</p>
+<p>A hand-sized example of how the objective trades goals off, using inputs that would come from uploaded data (certificates, branding, mileage, bays). Four trains, need 2 in revenue, at least 1 standby, IBL capacity 1. Default weights. Mean km = 200,000. Only B is branded.</p>
 <table>
 <tr><th>Train</th><th>Fit?</th><th>km</th><th>Branding need</th><th>Bay</th></tr>
 <tr><td>A</td><td>No (expired Signalling)</td><td>190,000</td><td>–</td><td>L1-P2</td></tr>
@@ -419,34 +368,30 @@ terms.append(int(weights["shunting"] * 10) * mv)</code></pre>
 <tr><td>Mileage</td><td>Reason: km above/below fleet mean.</td></tr>
 <tr><td>Cleaning due</td><td>Reason (uses slot) if in revenue; alert "Cleaning overdue" otherwise.</td></tr>
 <tr><td>Bay geometry</td><td>Revenue train with blockers: alert "Shunting needed: … block exit from …"; else reason "clear exit path".</td></tr>
-<tr><td>Headline (first reason)</td><td>"Fit for service and selected for revenue", "held as standby…", "Fit, but sent to IBL for preventive maintenance", "… sent to IBL: high compressor (APU) fault risk", or "Not fit for service…".</td></tr>
+<tr><td>Minutes below 7 bar</td><td>Alert "Air pressure below 7 bar for N min…".</td></tr>
+<tr><td>Headline (first reason)</td><td>"Fit for service…" only when certificate and job-card data were checked; otherwise "Selected for revenue; fitness not verified…". For IBL: "…sent to IBL: high compressor (APU) fault risk", "…air pressure fell below 7 bar", or "Not fit for service…".</td></tr>
 </table>
-<h2>Real output from the seeded plan</h2>
-<pre><code>TS-22  REVENUE  rank 2   score 64.4
-  - Fit for service and selected for revenue
-  - Branding: Kerala Tourism needs 12 h/day, 20 h short over 7 days — revenue service recovers exposure
-  - Compressor (APU) fault risk 23% from real MetroPT-3 sensor slice 2020-06-05 07:00 to 2020-06-05 18:30;
-    a reported air leak falls in this slice
-  - Mileage 185,547 km is 33,830 km below fleet mean
-  - Bay D1-L2-P2 has a clear exit path; no shunting
+<h2>Real output from the MetroPT-3 fleet</h2>
+<pre><code>TS-08  REVENUE  rank 1   score 53.5
+  - Selected for revenue; fitness not verified (no certificate or job-card data)
+  - Compressor (APU) fault risk 0% from real MetroPT-3 sensor slice 2020-02-15 15:30 to 2020-02-16 03:00
+  - Compressor loaded 5% of the time, below the fleet mean of 23%
 
-TS-09  REVENUE  rank 18  score 8.3
-  - Compressor (APU) fault risk 86% from real MetroPT-3 sensor slice 2020-05-13 23:00 to 2020-05-14 13:30
-  alert: Compressor (APU) fault risk 86% (...); inspect the air system before service
-  alert: Shunting needed: TS-01 block exit from D1-L1-P7
+TS-05  REVENUE  rank 15  score 42.1
+  alert: Air pressure below 7 bar for 9.7 min in its MetroPT-3 slice (LPS signal)
 
-TS-21  IBL      rank 21  score -16.5
-  - Certificates and job cards allow service, but sent to IBL: high compressor (APU) fault risk
+TS-21  IBL      rank 25  score -4.3
+  - No blocking fault on record, but sent to IBL: high compressor (APU) fault risk
   - Compressor (APU) fault risk 94% from real MetroPT-3 sensor slice 2020-05-29 20:30 to 2020-05-30 08:00;
     a reported air leak falls in this slice
+  - Compressor loaded 61% of the time, above the fleet mean of 23%
   alert: Compressor (APU) fault risk 94% (...); inspect the air system before service
-  alert: Cleaning overdue (4 days)
 
-TS-15  IBL      rank 24  score -77.9
-  - Not fit for service; must go to Inspection Bay Line
-  - Open critical job card WO100026: Bogie bearing temperature alarm (hard rule)
-  alert: Branding shortfall grows: Milma train not in revenue</code></pre>
-<p>TS-22 shows the model's weak spot honestly: its slice starts 3 hours before a real air leak, yet it scores only 23%. TS-09 shows a false alarm: 86% on a slice with no reported failure; it stays in revenue because its branding debt and low mileage outweigh the penalty, but the alert tells the supervisor to inspect it.</p>
+TS-03  IBL      rank 22  score 11.0
+  - No blocking fault on record, but sent to IBL: air pressure fell below 7 bar
+  - Compressor (APU) fault risk 4% (...); a reported air leak falls in this slice
+  alert: Air pressure below 7 bar for 89.1 min in its MetroPT-3 slice (LPS signal)</code></pre>
+<p>TS-03 shows why two real signals are better than one: the risk model missed the 15 July leak, but the low-pressure signal caught it.</p>
 <div class="note">In the API response, the alerts list is called <code>violations</code>. These are <em>soft</em> conflicts only. A hard-rule violation never appears in a generated plan.</div>
 
 <!-- 7 -->
@@ -459,16 +404,16 @@ TS-15  IBL      rank 24  score -77.9
 <tr><td><code>critical_job</code></td><td><code>{"type":"critical_job","train_id":"TS-22"}</code></td><td>Adds an OPEN CRITICAL job card "WO-SIM".</td></tr>
 <tr><td><code>required_revenue</code></td><td><code>{"type":"required_revenue","value":16}</code></td><td>Changes how many revenue trains are needed.</td></tr>
 </table>
-<h2>Results for seed 471 (from the README, checked by <code>test_readme_scenarios</code>)</h2>
-<p>Baseline: 18 Revenue, 2 Standby (TS-04, TS-16), 5 IBL (TS-21 because of compressor risk; TS-01, TS-15, TS-18, TS-19 unfit).</p>
+<h2>Results on the MetroPT-3 fleet (checked by <code>test_readme_scenarios</code>)</h2>
+<p>Baseline: 18 Revenue, 3 Standby (TS-22, TS-19, TS-06), 4 IBL (TS-21 and TS-09 for fault risk; TS-03 and TS-15 for minutes below 7 bar).</p>
 <table>
 <tr><th>Scenario</th><th>Diff</th></tr>
-<tr><td>TS-07 Rolling-Stock certificate expires</td><td>TS-07 REVENUE → IBL; TS-04 STANDBY → REVENUE; TS-21 IBL → STANDBY. Why TS-21: fit trains drop from 21 to 20, and 18 revenue + 2 standby need all 20, so TS-21 must leave IBL; standby carries no compressor penalty, so the 94%-risk train becomes the reserve.</td></tr>
-<tr><td>Critical fault on TS-22</td><td>TS-22 REVENUE → IBL; TS-04 STANDBY → REVENUE; TS-21 IBL → STANDBY.</td></tr>
-<tr><td>Only 16 revenue trains needed</td><td>TS-09 (86% compressor risk) and TS-20 REVENUE → STANDBY; TS-04 STANDBY → IBL for maintenance.</td></tr>
-<tr><td>One cleaning crew absent</td><td>No valid plan. Relaxation report: "Relax required revenue by 2" (relaxing cleaning slots by 2 would cost the same).</td></tr>
+<tr><td>TS-07 Rolling-Stock certificate expires (hypothetical: no certificate data is loaded, so the scenario adds an expired one)</td><td>TS-07 REVENUE → IBL; TS-22 STANDBY → REVENUE.</td></tr>
+<tr><td>Critical fault on TS-12</td><td>TS-12 REVENUE → IBL; TS-22 STANDBY → REVENUE.</td></tr>
+<tr><td>Only 16 revenue trains needed</td><td>TS-14 REVENUE → IBL (16.9 min below 7 bar); TS-16 REVENUE → STANDBY.</td></tr>
+<tr><td>Cleaning crews absent</td><td>Refused: "no cleaning data loaded, so cleaning crews cannot be simulated".</td></tr>
 </table>
-<p>The solver is deterministic (one worker thread, Section 5.7), so these diffs reproduced exactly in every run here; <code>test_readme_scenarios</code> passed in 3 of 3 full-suite runs after the change.</p>
+<p>The solver is deterministic (one worker thread, Section 5.7), so these diffs reproduce exactly.</p>
 
 <!-- 8 -->
 <h1 id="s8"><span class="num">8</span>Override learning</h1>
@@ -526,18 +471,18 @@ cross_val_predict(..., groups=calendar_month, cv=LeaveOneGroupOut(), method="pre
 <tr><td>False alarms at 50%</td><td>1.5% of windows; 3.9% of slices</td><td>1.5% of normal 30-minute windows score 50% or more. Because a slice's risk is its peak window, 3.9% of failure-free 12-hour slices (320 of 8,152) raise an alert. In the seed, 1 of 22 normal trains does (TS-09).</td></tr>
 <tr><td>Average precision</td><td>0.286</td><td>Few positives (167 of 8,627), so precision is the hard part.</td></tr>
 </table>
-<h2>Step 3: from one real train to 25 synthetic ones</h2>
-<p>MetroSched's fleet is synthetic and MetroPT-3 covers one train, so <code>assign_slices()</code> gives each trainset a seeded slice of 24 consecutive logged 30-minute windows (12 hours of logged data; longer in calendar time where the logger had gaps, e.g. TS-20's spans 20 hours). Three trainsets get a slice that overlaps a reported failure; the rest get slices at least a day away from any failure. A train's risk is the highest window score in its slice. <strong>This mapping is an assumption</strong>, recorded in ASSUMPTIONS.md; the sensor readings themselves are real.</p>
+<h2>Step 3: from one real train to a 25-train fleet</h2>
+<p><code>assign_slices()</code> gives each trainset a seeded slice of 24 consecutive logged windows; a train's risk is its slice's peak score. Three trainsets get a failure slice; the rest are at least a day from any failure. This mapping is an assumption; the readings are real. Each slice also yields compressor duty and minutes below 7 bar (Section 4).</p>
 <table>
-<tr><th>Train</th><th>Slice (2020)</th><th>Risk</th><th>Reported leak in slice?</th><th>Plan</th></tr>
-<tr><td>TS-21</td><td>29 May 20:30 – 30 May 08:00</td><td>94%</td><td>Yes</td><td>IBL (alert)</td></tr>
-<tr><td>TS-09</td><td>13 May 23:00 – 14 May 13:30</td><td>86%</td><td>No (false alarm)</td><td>Revenue, with alert</td></tr>
-<tr><td>TS-22</td><td>5 Jun 07:00 – 18:30</td><td>23%</td><td>Yes (leak starts 10:00)</td><td>Revenue</td></tr>
-<tr><td>TS-03</td><td>15 Jul 12:00 – 23:30</td><td>4%</td><td>Yes (missed by the model)</td><td>Revenue</td></tr>
+<tr><th>Train</th><th>Slice (2020)</th><th>Risk</th><th>Below 7 bar</th><th>Reported leak?</th><th>Plan</th></tr>
+<tr><td>TS-21</td><td>29 May 20:30 – 30 May 08:00</td><td>94%</td><td>0 min</td><td>Yes</td><td>IBL (alert)</td></tr>
+<tr><td>TS-09</td><td>13 May 23:00 – 14 May 13:30</td><td>86%</td><td>6 min</td><td>No (false alarm)</td><td>IBL (alerts)</td></tr>
+<tr><td>TS-03</td><td>15 Jul 12:00 – 23:30</td><td>4%</td><td>89 min</td><td>Yes (missed by the model)</td><td>IBL (low-pressure alert)</td></tr>
+<tr><td>TS-22</td><td>5 Jun 07:00 – 18:30</td><td>23%</td><td>0 min</td><td>Yes (leak starts 10:00)</td><td>Standby</td></tr>
 </table>
 <h2>Step 4: into the plan</h2>
 <ul>
-  <li>Objective: <code>+ int(500 × risk) × x[t, REVENUE]</code> (Section 5.3). Hard rules are unchanged: compressor risk alone never forces a train out.</li>
+  <li>Objective: <code>+ int(500 × risk) × x[t, REVENUE]</code>, plus the low-pressure and duty terms (Section 5.3). Compressor data is a soft goal, never a hard rule, because the model is not ground truth.</li>
   <li>Explanations: every train gets a compressor reason; 50% or more adds an alert.</li>
   <li>API: risk on every train in <code>/fleet/status</code>; model metrics on <code>GET /apu/model</code>.</li>
   <li>Dashboard: a risk chart, model stats and a slice table on <em>Fleet health</em>.</li>
@@ -553,15 +498,41 @@ Expand-Archive data\metropt3\metropt3.zip data\metropt3\raw
 .\.venv\Scripts\python data\metropt3\prepare.py      # 1,516,948 rows -> 8,627 windows, 167 in failure periods
 cd backend; ..\.venv\Scripts\python -m ml.apu_risk     # out-of-fold scores + metrics</code></pre>
 
+<!-- 8c -->
+<h1 id="s8c"><span class="num">8c</span>Knowledge base: retrieval (RAG without generation)</h1>
+<p class="lead">Retrieval-augmented generation (RAG) normally retrieves relevant passages and then has a language model write an answer. MetroSched does the first step only: it finds and quotes the right real documents with their source, and never writes new text.</p>
+<h2>The corpus (<code>data/kb/</code>): real documents only</h2>
+<table>
+<tr><th>File</th><th>Chunks</th><th>Content</th></tr>
+<tr><td><code>metropt3_failures.md</code></td><td>4</td><td>The four air-leak reports published with MetroPT-3, with the risk model's peak for each.</td></tr>
+<tr><td><code>metropt3_signals.md</code></td><td>6</td><td>The dataset's sensor documentation: APU, pressure sensors, motor current and oil temperature, digital signals, LPS low-pressure signal, other signals.</td></tr>
+<tr><td><code>work_orders.csv</code> (optional)</td><td>0</td><td>Real past work orders, if you supply them; none ship with the project.</td></tr>
+</table>
+<h2>How retrieval works (<code>backend/rag/kb.py</code>)</h2>
+<ol>
+  <li><strong>Chunk</strong> each Markdown file at its <code>##</code> headings (a <code>&lt;!-- source: real --&gt;</code> comment labels the file).</li>
+  <li><strong>Embed</strong> each chunk with <code>TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True, stop_words="english")</code>.</li>
+  <li><strong>Rank</strong> by cosine similarity to the query; ties break by chunk id; scores under 0.05 are dropped.</li>
+  <li><strong>Ask about a train:</strong> <code>topics_for_train()</code> turns its issues into queries, most serious first: critical job cards and expired certificates (when uploaded), fault risk ≥ 50%, minutes below 7 bar, other job cards.</li>
+</ol>
+<h2>Real output</h2>
+<pre><code>GET /kb/search?q=pressure below 7 bar&amp;k=2
+  "LPS low-pressure signal" (metropt3_signals.md, real, score 0.21)
+  "Pressure sensors TP2, TP3, H1, DV pressure, reservoirs" (metropt3_signals.md, real)
+GET /kb/train/TS-21
+  Compressor (APU) fault risk 94%  ->  "Air production unit (APU) and compressor" (0.246), ...</code></pre>
+<p>Retrieval is keyword-based (TF-IDF), not semantic, and the corpus is small (10 passages). Adding a generation step later would mean passing the retrieved passages to a language model with an instruction to answer only from them and cite them.</p>
+
 <!-- 9 -->
 <h1 id="s9"><span class="num">9</span>API reference</h1>
 <p>Base URL <code>http://localhost:8000</code>. Interactive docs at <code>/docs</code> (generated by FastAPI).</p>
 <table>
 <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
-<tr><td>GET</td><td>/health</td><td><code>{"status":"ok","synthetic_data":true}</code></td></tr>
-<tr><td>POST</td><td>/data/seed</td><td>Load the seeded dataset (<code>?trains=25&amp;depots=1&amp;seed=471</code>).</td></tr>
+<tr><td>GET</td><td>/health</td><td><code>{"status":"ok","synthetic_data":false,"real_data":["MetroPT-3 compressor sensors"]}</code></td></tr>
+<tr><td>GET</td><td>/data/status</td><td>Data source, inputs loaded, rules not checked, goals not used.</td></tr>
+<tr><td>DELETE</td><td>/data</td><td>Remove uploads; return to the MetroPT-3 fleet.</td></tr>
 <tr><td>POST</td><td>/data/ingest</td><td>Replace tables from a JSON body or uploaded files (<code>trainsets.json</code>, <code>job_cards.csv</code>…). Unknown datasets → 422.</td></tr>
-<tr><td>POST</td><td>/plan/generate</td><td>Solve, explain, store and return a plan. Body optional: <code>{"weights":{…}, "use_learned_weights":true}</code>. No data → 409.</td></tr>
+<tr><td>POST</td><td>/plan/generate</td><td>Solve, explain, store and return a plan. Body optional: <code>{"weights":{…}, "use_learned_weights":true}</code>. Response includes <code>rules_not_checked</code> and <code>goals_not_used</code>.</td></tr>
 <tr><td>POST</td><td>/plan/simulate</td><td><code>{"scenarios":[…]}</code> → baseline, scenario and changes.</td></tr>
 <tr><td>POST</td><td>/plan/override</td><td><code>{"train_id","to_assignment","reason","plan_id?"}</code>. Moving an unfit train out of IBL → 422.</td></tr>
 <tr><td>GET</td><td>/plan/overrides</td><td>All overrides, newest first.</td></tr>
@@ -569,83 +540,35 @@ cd backend; ..\.venv\Scripts\python -m ml.apu_risk     # out-of-fold scores + me
 <tr><td>GET</td><td>/plan/{id}</td><td>One stored plan.</td></tr>
 <tr><td>GET</td><td>/fleet/status</td><td>Every train with fitness, certificates (days left), job cards, branding, plus bays and config.</td></tr>
 <tr><td>GET</td><td>/ml/weights</td><td>Current weights and whether they are learned.</td></tr>
+<tr><td>GET</td><td>/kb/search</td><td><code>?q=…&amp;k=5</code>: knowledge-base hits as <code>hits</code>, <code>guidance</code> and <code>past_cases</code>, each with source and score (Section 8c).</td></tr>
+<tr><td>GET</td><td>/kb/train/{id}</td><td>For each of the train's issues tonight: matching guidance and similar past work orders.</td></tr>
 <tr><td>GET</td><td>/apu/model</td><td>Compressor risk model: data source and out-of-fold metrics (Section 8b).</td></tr>
 </table>
 <h2>Sample: POST /plan/generate (real, trimmed)</h2>
-<pre><code>{
-  "plan_id": 1, "service_date": "2026-11-01", "feasible": true,
-  "objective": 1397.0, "solve_seconds": 0.021, "weights_source": "default",
-  "weights": {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0, "maintenance": 4.0,
-              "apu_risk": 500.0},
-  "relaxations": [],
-  "items": [
-    {"train_id": "TS-07", "depot_id": "D1", "assignment": "REVENUE", "rank": 1, "score": 69.6,
-     "reasons": ["Fit for service and selected for revenue", "..."], "violations": []},
-    ... 24 more
-  ]
-}</code></pre>
-<h2>Sample: POST /plan/override (real)</h2>
-<pre><code>request:  {"train_id": "TS-04", "to_assignment": "REVENUE", "reason": "Special event service"}
-response: {"id": 1, "plan_id": 1, "train_id": "TS-04", "from_assignment": "STANDBY",
-           "to_assignment": "REVENUE", "reason": "Special event service", "supervisor": "supervisor",
-           "created_at": "2026-11-17T12:25:05.069780"}</code></pre>
-<h2>Sample: GET /health and POST /data/seed (real)</h2>
-<pre><code>GET  /health     -> {"status": "ok", "synthetic_data": true}
-POST /data/seed  -> {"loaded": {"config": 6, "depots": 1, "bays": 33, "trainsets": 25,
-                                "certificates": 75, "job_cards": 41, "branding": 8}}</code></pre>
-<h2>Sample: POST /data/ingest (real)</h2>
-<pre><code>JSON body: {"branding": [{"contract_id": "BR-X", "train_id": "TS-02", "advertiser": "Milma",
-                          "min_hours_per_day": 10, "hours_shortfall_7d": 6}]}
--> {"loaded": {"branding": 1}}
-
-Multipart file job_cards.csv:
-  wonum,assetnum,description,wopriority,status,reportdate
-  WO900001,TS-05,Pantograph inspection,HIGH,OPEN,2026-10-31
--> {"loaded": {"job_cards": 1}}
-
-JSON body {"nonsense": []}
--> 422 {"detail": "ingest failed: unknown dataset(s): ['nonsense']"}</code></pre>
-<h2>Sample: POST /plan/generate before any data is loaded (real)</h2>
-<pre><code>-> 409 {"detail": "No fleet data loaded. POST /data/seed or /data/ingest first."}</code></pre>
-<h2>Sample: GET /plan/{id} (real, items omitted)</h2>
-<pre><code>{"plan_id": 1, "created_at": "2026-11-17T12:25:04.997448", "service_date": "2026-11-01",
- "feasible": true, "relaxations": [], "objective": 1397.0, "solve_seconds": 0.018,
+<pre><code>{"plan_id": 1, "feasible": true, "objective": -63.0, "solve_seconds": 0.005, "data_source": "metropt3",
  "weights": {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0, "maintenance": 4.0,
-             "apu_risk": 500.0},
- "weights_source": "default", "items": [ ...25 items, same shape as /plan/generate... ]}</code></pre>
-<h2>Sample: POST /plan/simulate (real, trimmed)</h2>
-<pre><code>request: {"scenarios": [{"type": "critical_job", "train_id": "TS-22"}]}
-response:
-{"baseline": {"feasible": true, "items": [...25]}, "scenario": {"feasible": true, "items": [...25]},
- "changes": [
-   {"train_id": "TS-04", "before": "STANDBY", "after": "REVENUE",
-    "reasons": ["Fit for service and selected for revenue",
-                "All fitness certificates valid; earliest expiry Rolling-Stock on 2026-11-29", ...]},
-   {"train_id": "TS-21", "before": "IBL", "after": "STANDBY",
-    "reasons": ["Fit for service; held as standby because revenue requirement is met by higher-ranked trains", ...]},
-   {"train_id": "TS-22", "before": "REVENUE", "after": "IBL",
-    "reasons": ["Not fit for service; must go to Inspection Bay Line",
-                "Open critical job card WO-SIM: Simulated critical fault (hard rule)", ...]}]}</code></pre>
-<h2>Sample: GET /plan/overrides, /plan/history, /ml/weights (real)</h2>
-<pre><code>GET /plan/overrides -> [{"id": 1, "created_at": "2026-11-17T12:25:05.069780", "plan_id": 1,
-                         "train_id": "TS-04", "from_assignment": "STANDBY", "to_assignment": "REVENUE",
-                         "reason": "Special event service", "supervisor": "supervisor"}]
-GET /plan/history   -> [{"plan_id": 1, "created_at": "2026-11-17T12:25:04.997448",
-                         "service_date": "2026-11-01", "feasible": true, "objective": 1397.0,
-                         "solve_seconds": 0.018, "counts": {"REVENUE": 19, "STANDBY": 1, "IBL": 5}}]
-GET /ml/weights     -> {"weights": {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0,
-                         "maintenance": 4.0, "apu_risk": 500.0}, "source": "default", "overrides": 1,
-                         "min_required": 20}</code></pre>
-<p>The history counts (19 Revenue / 1 Standby) were taken after the override above, which edits the stored plan without re-solving. See Section 14.</p>
+             "apu_risk": 500.0, "compressor_duty": 2.0, "low_pressure": 5.0},
+ "rules_not_checked": ["Fitness certificates valid (no certificate data loaded)",
+                       "No open critical job card (no job-card data loaded)",
+                       "Cleaning-slot capacity (no cleaning data loaded)"],
+ "goals_not_used": [ ...branding, mileage, shunting... ],
+ "items": [{"train_id": "TS-08", "assignment": "REVENUE", "rank": 1, "score": 53.5,
+            "reasons": ["Selected for revenue; fitness not verified (no certificate or job-card data)", ...],
+            "violations": []}, ... 24 more]}</code></pre>
 <h2>Sample: GET /fleet/status (one train, real, trimmed)</h2>
-<pre><code>{"train_id": "TS-01", "depot_id": "D1", "cars": 3, "cumulative_km": 184469, "bay_id": "D1-L1-P6",
- "days_since_cleaning": 5, "fit": false, "cleaning_due": true,
- "certificates": [{"kind": "ROLLING_STOCK", "valid_until": "2026-11-08", "label": "Rolling-Stock", "days_left": 7}, ...],
- "job_cards": [{"wonum": "WO100001", "description": "Door actuator fault", "wopriority": "CRITICAL", "status": "OPEN", ...}],
- "branding": null,
- "apu": {"risk": 0.0, "slice_start": "2020-07-19 16:00", "slice_end": "2020-07-20 03:30",
-         "peak_window": "2020-07-19 16:00", "reported_failure_in_slice": false,
-         "source": "MetroPT-3 (UCI ML Repository, doi:10.24432/C5VW3R, CC BY 4.0)"}}</code></pre>
+<pre><code>{"train_id": "TS-21", "depot_id": "D1", "cars": 3, "cumulative_km": null, "bay_id": null,
+ "days_since_cleaning": null, "fit": null, "certificates": [], "job_cards": [], "branding": null,
+ "apu": {"risk": 0.935, "slice_start": "2020-05-29 20:30", "slice_end": "2020-05-30 08:00",
+         "peak_window": "2020-05-30 04:00", "reported_failure_in_slice": true, "duty": 0.606,
+         "low_pressure_minutes": 0.0, "oil_temp_max": 76.3, "source": "MetroPT-3 (...)"}}</code></pre>
+<h2>Samples: override, history, ingest errors (real)</h2>
+<pre><code>POST /plan/override {"train_id": "TS-22", "to_assignment": "REVENUE", "reason": "Special event service"}
+  -> {"id": 1, "plan_id": 1, "train_id": "TS-22", "from_assignment": "STANDBY", "to_assignment": "REVENUE", ...}
+GET /plan/history -> [{"plan_id": 1, "feasible": true, "objective": -63.0,
+                       "counts": {"REVENUE": 19, "STANDBY": 2, "IBL": 4}}]
+POST /data/ingest {"nonsense": []} -> 422 {"detail": "ingest failed: unknown dataset(s): ['nonsense']"}
+DELETE /data -> removes uploads; the next request uses the MetroPT-3 fleet again</code></pre>
+<p>The history counts (19 Revenue / 2 Standby) are taken after the override, which edits the stored plan without re-solving (Section 14).</p>
 
 <!-- 10 -->
 <h1 id="s10"><span class="num">10</span>Database schema</h1>
@@ -668,15 +591,16 @@ GET /ml/weights     -> {"weights": {"branding": 10.0, "mileage": 2.0, "shunting"
 <!-- 11 -->
 <h1 id="s11"><span class="num">11</span>Frontend</h1>
 <p>Next.js 15 (App Router) with TypeScript, Tailwind CSS 4, shadcn/ui, Recharts, Motion (Framer Motion), two React Bits components, and GSAP for the story page. The API base URL comes from <code>NEXT_PUBLIC_API_URL</code> (default <code>http://localhost:8000</code>).</p>
-<h2>Dashboard pages (<code>app/(desk)/</code>)</h2>
+<h2>Dashboard pages (<code>app/(desk)/</code>, seven in all)</h2>
 <table>
 <tr><th>Route</th><th>Page</th><th>What it shows</th></tr>
-<tr><td>/</td><td>Tonight's plan</td><td>Generate button; three summary cards (count + train plates per assignment); the ranked list. Selecting a row reveals all reasons, alerts and an override form.</td></tr>
-<tr><td>/fleet</td><td>Fleet health</td><td>Bar chart of days until each train's earliest certificate expiry (Expired / within 7 days / Valid); certificate table; compressor (APU) fault risk per train from real MetroPT-3 data, with model stats and a slice table; open job cards, critical first.</td></tr>
-<tr><td>/mileage</td><td>Mileage &amp; branding</td><td>Diverging bars of km from the fleet mean; branding shortfall chart and table.</td></tr>
-<tr><td>/depot</td><td>Depot bay map</td><td>Stabling lines with position 1 at the exit, each tile coloured and labelled by assignment; IBL occupancy; shunting moves.</td></tr>
-<tr><td>/simulate</td><td>What-if simulator</td><td>Scenario form; list of changed trains with new reasons, or the relaxation report.</td></tr>
+<tr><td>/</td><td>Tonight's plan</td><td>Generate button; three summary cards (count + train plates per assignment); the ranked list. Selecting a row reveals all reasons, alerts, an override form and the knowledge-base panel.</td></tr>
+<tr><td>/fleet</td><td>Fleet health</td><td>Compressor fault risk per train (real), model stats and slice table; certificates and job cards, or a "not loaded" notice.</td></tr>
+<tr><td>/usage</td><td>Compressor usage</td><td>Loaded duty per train against the fleet mean, and minutes below 7 bar (both real); mileage and branding, or "not loaded".</td></tr>
+<tr><td>/depot</td><td>Depot</td><td>Inspection bay line and why each train is there; stabling lines and shunting, or "not loaded".</td></tr>
+<tr><td>/simulate</td><td>What-if simulator</td><td>Scenario form (crews-absent disabled without cleaning data); changed trains with new reasons, or the relaxation report.</td></tr>
 <tr><td>/overrides</td><td>Override log</td><td>Current weights (default or learned) and every override.</td></tr>
+<tr><td>/knowledge</td><td>Knowledge base</td><td>Search the real MetroPT-3 documents; results with source and score.</td></tr>
 </table>
 <h2>Brand and design tokens</h2>
 <p>A dark "night desk" theme for supervisors working at night. Tokens live in <code>app/globals.css</code> under <code>:root</code>:</p>
@@ -699,7 +623,7 @@ GET /ml/weights     -> {"weights": {"branding": 10.0, "mileage": 2.0, "shunting"
 <p>A scroll-driven explainer built with GSAP <code>ScrollTrigger</code> and plain CSS 3D (<code>perspective</code>, <code>preserve-3d</code>), no 3D library. Each train is a box made of three faces (<code>.face-top</code>, <code>.face-front</code>, <code>.face-side</code>).</p>
 <ol>
   <li>Hero: "Every train, a reason." headline reveal.</li>
-  <li>Pinned depot scene (scrubbed timeline, about 3,200 px of scroll): the floor tilts into 3D, trains drop in, a scan beam sweeps, IBL trains turn red and roll to the inspection bay, the rest turn Revenue or Standby, and TS-22 leaves through the exit. Captions change at each step.</li>
+  <li>Pinned depot scene (scrubbed timeline, about 3,200 px of scroll): the floor tilts into 3D, trains drop in, a scan beam sweeps, IBL trains turn red and roll to the inspection bay, the rest turn Revenue or Standby, and the first train leaves through the exit. Captions change at each step. The animation is illustrative and shows no data.</li>
   <li>A 3D carousel of the six inputs turns with scroll; cards fade as they turn away.</li>
   <li>Proof numbers and a link back to the dashboard.</li>
 </ol>
@@ -708,32 +632,29 @@ GET /ml/weights     -> {"weights": {"branding": 10.0, "mileage": 2.0, "shunting"
 <ul>
   <li>Assignment is never shown by colour alone: badges carry an icon and a word; depot tiles say "Rev / Stby / IBL".</li>
   <li>Skip-to-content link, visible focus rings, <code>aria-current</code> on the active nav item, <code>aria-expanded</code> on rows.</li>
-  <li>Charts have legends and a table view (certificates, branding, compressor slices).</li>
-  <li>A "synthetic data" notice on every dashboard page.</li>
+  <li>Charts have legends; the compressor slices also have a table view.</li>
+  <li>A "No synthetic data" notice on every dashboard page, and a "not loaded" notice wherever an input has no real data.</li>
 </ul>
 
 <!-- 12 -->
 <h1 id="s12"><span class="num">12</span>Testing</h1>
-<h2>Backend: pytest (28 tests)</h2>
+<h2>Backend: pytest (39 tests)</h2>
 <pre><code>.\.venv\Scripts\python -m pytest backend\tests -q</code></pre>
 <table>
 <tr><th>File</th><th>What it proves</th></tr>
-<tr><td>test_generator.py (3)</td><td>Same seed → same data; 25 trains have 75 certificates and valid bays; 40 trains split across D1 and D2.</td></tr>
-<tr><td>test_constraints.py (3)</td><td>An expired certificate or open critical job card makes a train unfit; the checker flags an unfit train in revenue and accepts it in IBL.</td></tr>
-<tr><td>test_optimizer.py (4)</td><td>Seeded plan is feasible, passes <code>check_plan</code>, every train has reasons and ranks 1–25; unfit trains go to IBL; an impossible revenue target returns a relaxation; a huge branding weight puts every fit branded train in revenue.</td></tr>
-<tr><td>test_simulate.py (4)</td><td>Certificate expiry and critical faults move the train to IBL; absent crews respect fewer slots or report a relaxation; the exact README diffs, on the fleet with compressor risk attached (as the API sees it).</td></tr>
-<tr><td>test_ml.py (2)</td><td>Fewer than 20 overrides → defaults; a consistent branding preference raises the branding weight.</td></tr>
-<tr><td>test_api.py (5)</td><td>409 before seeding; generate/get/history; simulate diff; override logging and the unfit-train 422; JSON and CSV ingest.</td></tr>
-<tr><td>test_apu.py (6)</td><td>Failure labels overlap the reported periods; windows are built correctly from raw rows; the model ranks failures above normal operation (AUC &gt; 0.9) across all 4 events; slice assignment is deterministic with exactly 3 failure slices; a 95% risk pushes a revenue train out with an alert and no hard-rule violation; the API exposes risk and model metrics.</td></tr>
-<tr><td>test_perf.py (1)</td><td>40 trains / 2 depots solve in under 10 s with zero hard violations.</td></tr>
+<tr><td>test_real_fleet.py (5)</td><td>The default fleet has no invented inputs; missing inputs are reported (3 rules not checked, 3 goals not used); the plan runs on real sensor data with no mileage or certificate claims; <code>/fleet/status</code> never claims fitness without data; minutes below 7 bar raise an alert.</td></tr>
+<tr><td>test_apu.py (6)</td><td>Failure labels and window aggregation; the model ranks failures above normal operation; slice assignment is deterministic; high risk pushes a train out of revenue; the API exposes risk.</td></tr>
+<tr><td>test_rag.py (6)</td><td>The corpus is real documents only; LPS and air-leak queries find the right documents; search is deterministic; topics follow real alarms; the <code>/kb</code> endpoints work.</td></tr>
+<tr><td>test_simulate.py (4)</td><td>Scenarios on the fixture fleet, and the exact README scenarios on the real MetroPT-3 fleet.</td></tr>
+<tr><td>test_api.py (5)</td><td>No uploads → MetroPT-3 fleet; uploads through <code>/data/ingest</code> → plan, history, simulate, override, CSV ingest.</td></tr>
+<tr><td>test_optimizer.py (4), test_constraints.py (3), test_ml.py (2), test_generator.py (3), test_perf.py (1)</td><td>Rules, relaxation, learning, the fixture generator, and 40 trains / 2 depots in under 10 s.</td></tr>
 </table>
-<div class="note"><strong>The flaky test is fixed.</strong> Before 17 November, <code>test_readme_scenarios</code> failed in 2 of 12 full-suite runs (and 6 of 15 isolated runs) because CP-SAT's 8 parallel workers returned either of two equal-cost plans. The solver now uses one worker (Section 5.7); after the change the full suite passed 28/28 in 3 of 3 runs.</div>
+<p>Tests that need certificates, job cards or bays use <code>backend/tests/fixture_data.py</code>, an invented fleet that lives in the tests folder only and is never loaded by the app.</p>
 <h2>Frontend</h2>
 <pre><code>cd frontend
-npx vitest run           # 6 tests: format helpers and components
-npx playwright test      # 1 end-to-end smoke test</code></pre>
-<p>The Playwright test starts the backend and frontend if they are not running, seeds data, clicks <em>Generate plan</em>, expects 25 ranked rows, and opens a row to see "Reasons". Results on 17 November 2026: Vitest 6/6 passed; Playwright 1/1 passed. The production build (<code>npm run build</code>) passed on 17 November 2026, after the compressor-risk section was added.</p>
-<p>All three suites: <code>.\run.ps1 test</code>.</p>
+npx vitest run           # 6 tests
+npx playwright test      # 1 smoke test: clears uploads, generates a plan from MetroPT-3 data in the browser</code></pre>
+<p>Results on 17 November 2026: pytest 39/39, Vitest 6/6, Playwright 1/1, type-check clean.</p>
 
 <!-- 13 -->
 <h1 id="s13"><span class="num">13</span>Rebuild workflow</h1>
@@ -746,25 +667,28 @@ python -m venv .venv
 .\.venv\Scripts\python -m pip install --only-binary=:all: ortools fastapi "pydantic>=2" sqlalchemy scikit-learn uvicorn python-multipart pytest httpx</code></pre>
 <div class="check">You should now see: <code>.\.venv\Scripts\python -c "import ortools, fastapi, sklearn"</code> prints nothing (no error).</div>
 <p>Tip from the original build: a first install without <code>--only-binary=:all:</code> stalled for over 10 minutes on Python 3.14 and was stopped; the same install with the flag finished normally. The exact cause was not investigated.</p>
-<h2>Phase 2: Data generator</h2>
-<p>Write <code>data/generator.py</code> (Section 4): <code>generate()</code> returns a dict with config, depots, bays, trainsets, certificates, job_cards, branding; <code>write()</code> saves JSON plus <code>job_cards.csv</code>.</p>
-<div class="check">You should now see: <code>python data/generator.py</code> prints "wrote 25 trains / 1 depot(s)" and <code>data/seed/</code> holds 7 files.</div>
+<h2>Phase 2: Real data and a test fixture</h2>
+<p>Download MetroPT-3 and run <code>data/metropt3/prepare.py</code> (Section 8b). Write <code>data/fleet_config.json</code> and <code>app/metropt_fleet.py</code>. For tests only, write <code>backend/tests/fixture_data.py</code>, a seeded invented fleet with certificates, job cards and bays.</p>
+<div class="check">You should now see: <code>prepare.py</code> prints "1,516,948 rows -> 8,627 windows, 167 in failure periods".</div>
 <h2>Phase 3: Snapshot and hard rules (test first)</h2>
 <p>Write <code>optimizer/snapshot.py</code>, then tests in <code>test_constraints.py</code>, then <code>constraints.py</code> (<code>is_fit</code>, <code>cleaning_due</code>, <code>check_plan</code>). Add <code>backend/tests/conftest.py</code> that puts <code>backend/</code> and <code>data/</code> on the import path and provides <code>snap25</code>.</p>
 <div class="check">You should now see: <code>pytest backend/tests/test_constraints.py</code> passes.</div>
 <h2>Phase 4: CP-SAT model and explanations</h2>
 <p>Write <code>test_optimizer.py</code>, then <code>model.py</code> (Section 5) and <code>explain.py</code> (Section 6).</p>
-<div class="check">You should now see: the seeded plan has 18 / 2 / 5 (Revenue / Standby / IBL) and <code>check_plan</code> returns an empty list.</div>
+<div class="check">You should now see: the fixture-fleet plan solves and <code>check_plan</code> returns an empty list.</div>
 <h2>Phase 5: Simulation and learning</h2>
 <p>Write <code>simulate.py</code> and <code>ml/learner.py</code> with their tests.</p>
 <div class="check">You should now see: without compressor data attached, the TS-07 scenario moves TS-07 to IBL and brings a standby or IBL train into Revenue.</div>
-<h2>Phase 5b: Real compressor data</h2>
-<p>Download MetroPT-3, write <code>data/metropt3/prepare.py</code> and <code>ml/apu_risk.py</code> (Section 8b), add the compressor term to <code>model.py</code> and reasons to <code>explain.py</code>, then <code>test_apu.py</code>. Set <code>num_workers = 1</code> in the solver.</p>
-<div class="check">You should now see: <code>python -m ml.apu_risk</code> prints <code>roc_auc 0.975</code> and <code>events_detected 2</code> of 4; the seeded plan puts TS-21 in IBL with a 94% compressor alert.</div>
+<h2>Phase 5b: Compressor risk and missing inputs</h2>
+<p>Write <code>ml/apu_risk.py</code> (scores, slices, statistics), add <code>available</code> to the snapshot so rules without data are skipped and reported, add the compressor terms to <code>model.py</code>, then <code>test_apu.py</code> and <code>test_real_fleet.py</code>. Set <code>num_workers = 1</code>.</p>
+<div class="check">You should now see: <code>python -m ml.apu_risk</code> prints <code>roc_auc 0.975</code>; the MetroPT-3 fleet plan is 18 / 3 / 4 with TS-21 and TS-03 in IBL.</div>
+<h2>Phase 5c: Knowledge base</h2>
+<p>Write <code>data/kb/metropt3_failures.md</code> and <code>metropt3_signals.md</code> from the dataset page (one <code>##</code> section per topic, <code>&lt;!-- source: real --&gt;</code> on line 1), then <code>rag/kb.py</code> and <code>test_rag.py</code>.</p>
+<div class="check">You should now see: <code>load_chunks()</code> returns 10 real chunks; "LPS low pressure signal below 7 bar" returns the LPS section first.</div>
 <h2>Phase 6: Database and API</h2>
 <p>Write <code>app/db.py</code>, <code>models.py</code>, <code>schemas.py</code>, <code>repo.py</code>, <code>main.py</code> (use a <code>create_app(db_url)</code> factory so tests get a fresh temp database), then <code>test_api.py</code> and <code>test_perf.py</code>.</p>
 <pre><code>.\.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --port 8000</code></pre>
-<div class="check">You should now see: <code>http://localhost:8000/docs</code> lists all endpoints; <code>POST /data/seed</code> then <code>POST /plan/generate</code> returns 25 items, each with a compressor reason. Full pytest: 28 passed.</div>
+<div class="check">You should now see: <code>http://localhost:8000/docs</code> lists all endpoints; <code>POST /plan/generate</code> with no uploads returns 25 items and lists 3 rules not checked. Full pytest: 39 passed.</div>
 <h2>Phase 7: Frontend skeleton</h2>
 <p><strong>Step 1, scaffold and install</strong> (the flags are the ones used in the original build):</p>
 <pre><code>npx create-next-app@15 frontend --ts --tailwind --app --eslint --no-src-dir --import-alias "@/*" --use-npm --no-turbopack --yes
@@ -812,26 +736,25 @@ cd metrosched
 <tr><td>Snapshot object between DB and solver</td><td>Optimizer is testable without a database; simulation is a simple copy.</td><td>Data is loaded per request.</td></tr>
 <tr><td>Relaxation report instead of a broken plan</td><td>The brief: hard constraints must never be violated.</td><td>Supervisor gets no plan until capacity changes.</td></tr>
 <tr><td>Multi-depot in the data model and tests, one depot in the UI</td><td>Meets the scale requirement while keeping the demo focused.</td><td>Second depot is not visible on screen.</td></tr>
-<tr><td>Real compressor data as a soft goal, not a hard rule</td><td>The model misses some failures and raises some false alarms, so a supervisor should weigh it, not obey it.</td><td>A high-risk train can still run if it is badly needed (TS-09 in the seed), with an alert.</td></tr>
+<tr><td>No synthetic data; missing inputs reported, not invented</td><td>A plan should never rest on made-up certificates or job cards.</td><td>Without uploads, three hard rules are not checked; every plan says so.</td></tr>
+<tr><td>Real compressor data as a soft goal, not a hard rule</td><td>The model misses some failures and raises some false alarms, so a supervisor should weigh it, not obey it.</td><td>A high-risk train can still run if it is badly needed, with an alert.</td></tr>
 <tr><td>Single-thread solver</td><td>Same input, same plan; reproducible tests and docs.</td><td>No parallel speed-up (not needed at 25–40 trains).</td></tr>
-<tr><td>IBL capacity 6 (was 4)</td><td>With 4, the seeded IBL was already full, so the certificate-expiry and critical-fault scenarios (which add an IBL train) were infeasible.</td><td>An assumption, recorded in ASSUMPTIONS.md.</td></tr>
 </table>
 <h2>Known limitations</h2>
 <ul>
-  <li>Cleaning-slot and IBL capacities are fleet-wide totals, not per depot.</li>
-  <li>Shunting uses blocking pairs on a line, not a full move-sequence plan.</li>
-  <li>Compressor risk comes from one real Porto train mapped onto synthetic Kochi trainsets. The model catches 2 of 4 reported failures at 50% and raises false alarms (TS-09).</li>
-  <li>The override learner re-weights soft goals only.</li>
-  <li><strong>Overrides are not re-solved.</strong> They are logged and shown, but the stored plan is edited directly. Observed while writing this guide: after moving TS-04 from Standby to Revenue, the plan history showed 19 Revenue / 1 Standby, which is above the 18 required and below the 2-standby minimum. Hard rules are enforced only on generated plans.</li>
-  <li>An override cannot be undone from the UI except by overriding again.</li>
-  <li>Dark theme only.</li>
+  <li>MetroPT-3 is one Porto train mapped onto 25 Kochi trainsets. The risk model misses 2 of 4 reported failures at 50% and raises false alarms (TS-09).</li>
+  <li>Without uploads, certificates, critical job cards and cleaning capacity are not checked, and branding, mileage and shunting are not planned.</li>
+  <li>Knowledge-base retrieval is keyword-based over a small real corpus (10 passages).</li>
+  <li><strong>Overrides are not re-solved.</strong> They are logged, but the stored plan is edited directly: after moving TS-22 from Standby to Revenue, history showed 19 Revenue / 2 Standby.</li>
+  <li>Capacities are fleet-wide, not per depot; shunting is a blocking-pair model; dark theme only.</li>
 </ul>
 <h2>Ideas for extending it</h2>
 <ul>
   <li>Improve the compressor model: add rolling features over several hours, tune the alert threshold per use, or try the anomaly-detection methods from the MetroPT-3 papers.</li>
   <li>Re-solve after each override with that train's assignment fixed, so overrides respect the hard rules.</li>
+  <li>Add the generation step to the knowledge base (an assistant that answers only from retrieved passages and cites them), or switch to neural embeddings for meaning-based search.</li>
   <li>Per-depot capacities: index the cleaning and IBL constraints by depot.</li>
-  <li>Extend withdrawal-risk prediction beyond the compressor, using job-card history.</li>
+  <li>Load real KMRL certificates, Maximo job cards and depot layout to switch on the remaining rules.</li>
   <li>Real data connectors: a Maximo export watcher, certificate uploads.</li>
   <li>A move-sequence shunting planner for the depot map.</li>
 </ul>
@@ -847,7 +770,7 @@ cd metrosched
 <tr><td>IBL</td><td>Inspection Bay Line: depot tracks for inspection and maintenance.</td></tr>
 <tr><td>Fitness certificate</td><td>Document with an expiry date proving a subsystem (Rolling-Stock, Signalling, Telecom) is safe.</td></tr>
 <tr><td>Job card / work order</td><td>A maintenance task. CRITICAL + OPEN blocks service.</td></tr>
-<tr><td>IBM Maximo</td><td>Asset-management software KMRL uses for work orders; its export columns (wonum, assetnum, wopriority) are mimicked.</td></tr>
+<tr><td>IBM Maximo</td><td>Asset-management software KMRL uses for work orders; uploads use its export columns (wonum, assetnum, wopriority).</td></tr>
 <tr><td>Branding</td><td>Advertiser wraps on trains, with contracted exposure hours.</td></tr>
 <tr><td>Mileage balancing</td><td>Spreading kilometres evenly to even out component wear.</td></tr>
 <tr><td>Stabling line</td><td>A depot track where trains park overnight, one behind another.</td></tr>
@@ -856,6 +779,9 @@ cd metrosched
 <tr><td>APU</td><td>Air production unit: the train's air compressor system.</td></tr>
 <tr><td>MetroPT-3</td><td>Public dataset of real APU sensor readings from a Metro do Porto train (2020), with four reported air leaks.</td></tr>
 <tr><td>Out-of-fold score</td><td>A prediction made by a model that did not see that data point during training.</td></tr>
+<tr><td>RAG</td><td>Retrieval-augmented generation: retrieve relevant passages, then generate an answer from them. MetroSched implements the retrieval step only.</td></tr>
+<tr><td>TF-IDF</td><td>Term frequency–inverse document frequency: a word-weighting scheme that turns text into vectors; words common everywhere count for little.</td></tr>
+<tr><td>Cosine similarity</td><td>How closely two vectors point the same way (0 to 1 here); used to rank passages against a query.</td></tr>
 <tr><td>CP-SAT</td><td>Google OR-Tools' constraint-programming / SAT solver used for the plan.</td></tr>
 <tr><td>Hard constraint</td><td>A rule a plan must never break.</td></tr>
 <tr><td>Soft constraint / objective</td><td>A goal turned into a weighted penalty the solver minimises.</td></tr>
@@ -863,9 +789,11 @@ cd metrosched
 <tr><td>Relaxation</td><td>Loosening a capacity rule by the smallest amount needed for a feasible plan.</td></tr>
 <tr><td>Snapshot</td><td><code>FleetSnapshot</code>: one night's data in memory.</td></tr>
 <tr><td>Override</td><td>A supervisor changing a generated assignment, with a reason.</td></tr>
-<tr><td>Seed</td><td>Fixed random number (471) that makes generated data repeatable.</td></tr>
+<tr><td>Seed</td><td>Fixed random number (471) that makes the slice assignment repeatable.</td></tr>
+<tr><td>LPS</td><td>MetroPT-3 signal that is active when air pressure is below 7 bar.</td></tr>
+<tr><td>Compressor duty</td><td>Share of time the compressor ran under load (DV electric signal).</td></tr>
 <tr><td>SIH25081</td><td>Smart India Hackathon problem statement this project is based on.</td></tr>
 </table>
-<p class="lead" style="margin-top:14pt">End of guide. Source: the MetroSched repository (commit 506c107 plus the MetroPT-3 changes of 17 November 2026). Planning data is synthetic; compressor sensor data is real (MetroPT-3, CC BY 4.0).</p>
+<p class="lead" style="margin-top:14pt">End of guide. Source: the MetroSched repository as of 17 November 2026. No synthetic data: compressor sensor data is real (MetroPT-3, CC BY 4.0); other inputs are loaded only from real uploads.</p>
 </body>
 </html>

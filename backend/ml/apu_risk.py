@@ -91,6 +91,27 @@ def load_scores() -> pd.DataFrame | None:
     return scores
 
 
+@lru_cache(maxsize=1)
+def load_windows() -> pd.DataFrame | None:
+    """The 30-minute feature windows (same row order as the scores)."""
+    return pd.read_csv(WINDOWS) if WINDOWS.exists() else None
+
+
+def slice_stats(start: int, windows: pd.DataFrame | None = None) -> dict:
+    """Real per-slice operating statistics, reported under their own names (not mapped onto other fleet data)."""
+    windows = load_windows() if windows is None else windows
+    if windows is None:
+        return {}
+    sl = windows.iloc[start:start + SLICE_WINDOWS]
+    return {
+        # DV electric is on while the compressor works under load, so its mean is the loaded share of time.
+        "duty": round(float(sl["DV_eletric_mean"].mean()), 3),
+        # LPS is on while air pressure is below 7 bar; mean x 30 min = minutes below 7 bar in each window.
+        "low_pressure_minutes": round(float(sl["LPS_mean"].sum() * 30), 1),
+        "oil_temp_max": round(float(sl["Oil_temperature_mean"].max()), 1),
+    }
+
+
 def assign_slices(train_ids: list[str], seed: int = 471, scores: pd.DataFrame | None = None) -> dict[str, dict]:
     """Deterministically map each trainset to a 12-hour slice of the real MetroPT-3 timeline."""
     scores = load_scores() if scores is None else scores
@@ -123,6 +144,7 @@ def assign_slices(train_ids: list[str], seed: int = 471, scores: pd.DataFrame | 
             "peak_window": str(scores.loc[peak, "window_start"]),
             "reported_failure_in_slice": bool(sl["failure"].any()),
             "source": SOURCE,
+            **slice_stats(start),
         }
     return out
 

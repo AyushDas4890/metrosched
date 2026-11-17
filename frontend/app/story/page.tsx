@@ -11,7 +11,7 @@ import "./story.css";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 type A = "REVENUE" | "STANDBY" | "IBL";
-// Illustrative depot: 3 stabling lines x 4 positions. Synthetic, mirrors the seeded scenario's shape.
+// Illustrative animation only: no data is shown here. Train numbers and positions are made up for the walkthrough.
 const TRAINS: { id: string; line: number; pos: number; a: A }[] = [
   { id: "TS-22", line: 0, pos: 0, a: "REVENUE" }, { id: "TS-07", line: 0, pos: 1, a: "REVENUE" },
   { id: "TS-15", line: 0, pos: 2, a: "IBL" }, { id: "TS-24", line: 0, pos: 3, a: "REVENUE" },
@@ -122,7 +122,7 @@ export default function Story() {
       {/* Hero */}
       <section className="flex min-h-screen flex-col justify-center px-5 md:px-16">
         <p className="hero-sub mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-standby/40 bg-standby/10 px-3 py-1 text-sm text-standby-ink">
-          CSE 471 project · synthetic planning data · real compressor data
+          CSE 471 project · illustrative walkthrough · the dashboard uses real MetroPT-3 data
         </p>
         <h1 className="display font-condensed text-[clamp(3.5rem,11vw,10rem)] font-bold uppercase">
           <span className="block overflow-hidden"><span className="hero-line block">Every train,</span></span>
@@ -217,7 +217,7 @@ export default function Story() {
           Open tonight&apos;s plan
         </Link>
         <p className="max-w-md text-sm text-muted-foreground">
-          Planning data is synthetic; compressor sensor data is real (MetroPT-3, CC BY 4.0). Assumptions are listed in docs/ASSUMPTIONS.md.
+          This page is an illustrative animation. The dashboard runs on real MetroPT-3 compressor data (CC BY 4.0); see docs/ASSUMPTIONS.md.
         </p>
       </section>
     </div>

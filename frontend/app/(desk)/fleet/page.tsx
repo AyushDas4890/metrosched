@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ApuRiskSection } from "@/components/apu-risk-section";
+import { NotLoaded } from "@/components/not-loaded";
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { TrainPlate } from "@/components/train-plate";
 import { earliestExpiry, expiryTone } from "@/lib/format";
@@ -31,6 +32,9 @@ export default function FleetHealth() {
   return (
     <div>
       <PageHeader title="Fleet health" />
+      <ApuRiskSection trains={fleet.trains} />
+
+      {fleet.inputs_loaded.certificates ? (
       <section aria-labelledby="exp" className="mb-8 rounded-xl border bg-card p-5">
         <h2 id="exp" className="font-condensed text-2xl font-bold">
           Days until each train&apos;s earliest fitness certificate expires
@@ -91,9 +95,13 @@ export default function FleetHealth() {
           </div>
         </details>
       </section>
+      ) : (
+        <div className="mb-8">
+          <NotLoaded what="fitness certificate" effect="The certificate hard rule is not checked, so no train is held out for an expired certificate." />
+        </div>
+      )}
 
-      <ApuRiskSection trains={fleet.trains} />
-
+      {fleet.inputs_loaded.job_cards ? (
       <section aria-labelledby="jobs" className="rounded-xl border bg-card p-5">
         <h2 id="jobs" className="mb-3 font-condensed text-2xl font-bold">
           Open job cards ({openJobs.length})
@@ -127,6 +135,9 @@ export default function FleetHealth() {
           </table>
         </div>
       </section>
+      ) : (
+        <NotLoaded what="Maximo job card" effect="The critical-job-card hard rule is not checked." />
+      )}
     </div>
   );
 }

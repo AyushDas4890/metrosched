@@ -33,6 +33,10 @@ class PlanOut(BaseModel):
     solve_seconds: float
     weights: dict[str, float]
     weights_source: str = "default"
+    data_source: str = "metropt3"
+    inputs_loaded: dict[str, bool] = {}
+    rules_not_checked: list[str] = []
+    goals_not_used: list[str] = []
 
 
 class GenerateIn(BaseModel):

@@ -38,15 +38,16 @@ def _diff(snap, scenario):
     return r["scenario"], {(c["train_id"], c["before"], c["after"]) for c in r["changes"]}
 
 
-def test_readme_scenarios(snap25_apu):
-    """The four what-if scenarios documented in README.md, on the fleet as the API sees it (with MetroPT-3 risk)."""
-    snap = snap25_apu
+def test_readme_scenarios():
+    """The what-if scenarios documented in README.md, on the real-data-only (MetroPT-3) fleet the app uses."""
+    from test_real_fleet import real_snapshot
+    snap = real_snapshot()
     _, d = _diff(snap, {"type": "cert_expire", "train_id": "TS-07", "kind": "ROLLING_STOCK"})
-    assert d == {("TS-07", "REVENUE", "IBL"), ("TS-04", "STANDBY", "REVENUE"), ("TS-21", "IBL", "STANDBY")}
-    _, d = _diff(snap, {"type": "critical_job", "train_id": "TS-22"})
-    assert d == {("TS-22", "REVENUE", "IBL"), ("TS-04", "STANDBY", "REVENUE"), ("TS-21", "IBL", "STANDBY")}
+    assert d == {("TS-07", "REVENUE", "IBL"), ("TS-22", "STANDBY", "REVENUE")}
+    _, d = _diff(snap, {"type": "critical_job", "train_id": "TS-12"})
+    assert d == {("TS-12", "REVENUE", "IBL"), ("TS-22", "STANDBY", "REVENUE")}
     _, d = _diff(snap, {"type": "required_revenue", "value": 16})
-    assert d == {("TS-09", "REVENUE", "STANDBY"), ("TS-20", "REVENUE", "STANDBY"), ("TS-04", "STANDBY", "IBL")}
-    res, _ = _diff(snap, {"type": "crews_absent", "count": 1})
-    assert not res.feasible
-    assert any(r["relax_by"] == 2 for r in res.relaxations if r["constraint"] != "info")
+    assert d == {("TS-14", "REVENUE", "IBL"), ("TS-16", "REVENUE", "STANDBY")}
+    import pytest
+    with pytest.raises(ValueError, match="no cleaning data"):
+        apply_scenario(snap, {"type": "crews_absent", "count": 1})

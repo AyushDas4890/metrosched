@@ -68,7 +68,6 @@ def test_api_exposes_risk(tmp_path):
     from fastapi.testclient import TestClient
     from app.main import create_app
     c = TestClient(create_app(f"sqlite:///{tmp_path / 'a.db'}"))
-    c.post("/data/seed")
     trains = c.get("/fleet/status").json()["trains"]
     assert all(t["apu"] and "risk" in t["apu"] for t in trains)
     model = c.get("/apu/model").json()

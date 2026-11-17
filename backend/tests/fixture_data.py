@@ -1,4 +1,8 @@
-"""Seeded synthetic data generator for MetroSched.
+"""TEST FIXTURE ONLY: seeded synthetic fleet data for exercising the optimizer and API in tests.
+
+It is never loaded by the app. The app runs on real data only (MetroPT-3, plus uploaded real files).
+
+Seeded synthetic data generator (formerly data/generator.py).
 
 All per-train values are synthetic. See docs/ASSUMPTIONS.md.
 

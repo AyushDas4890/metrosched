@@ -27,6 +27,10 @@ export interface Plan {
   solve_seconds: number;
   weights: Record<string, number>;
   weights_source: string;
+  data_source: "metropt3" | "uploaded";
+  inputs_loaded: Record<string, boolean>;
+  rules_not_checked: string[];
+  goals_not_used: string[];
 }
 
 export interface Certificate {
@@ -58,10 +62,11 @@ export interface Train {
   train_id: string;
   depot_id: string;
   cars: number;
-  cumulative_km: number;
-  bay_id: string;
-  days_since_cleaning: number;
-  fit: boolean;
+  cumulative_km: number | null;
+  bay_id: string | null;
+  days_since_cleaning: number | null;
+  /** null when no certificate or job-card data is loaded, so fitness is unknown. */
+  fit: boolean | null;
   cleaning_due: boolean;
   certificates: Certificate[];
   expired: string[];
@@ -79,6 +84,11 @@ export interface ApuRisk {
   peak_window: string;
   reported_failure_in_slice: boolean;
   source: string;
+  /** Share of the slice the compressor ran under load (real, from the DV electric signal). */
+  duty: number;
+  /** Minutes the air pressure was below 7 bar in the slice (real, from the LPS signal). */
+  low_pressure_minutes: number;
+  oil_temp_max: number;
 }
 
 export interface ApuModel {
@@ -97,6 +107,23 @@ export interface ApuModel {
   };
 }
 
+/** One retrieved knowledge-base passage. `source` says whether it is real data or synthetic. */
+export interface KbHit {
+  id: string;
+  doc: string;
+  title: string;
+  source: "real" | "synthetic";
+  snippet: string;
+  score: number;
+}
+
+export interface KbTopic {
+  topic: string;
+  query: string;
+  guidance: KbHit[];
+  past_cases: KbHit[];
+}
+
 export interface Bay {
   bay_id: string;
   depot_id: string;
@@ -107,7 +134,11 @@ export interface Bay {
 
 export interface FleetStatus {
   service_date: string;
-  config: { required_revenue: number; min_standby: number; cleaning_slots: number; ibl_capacity: number; cleaning_due_days: number };
+  config: { required_revenue: number; min_standby: number; cleaning_slots: number | null; ibl_capacity: number; cleaning_due_days: number };
+  data_source: "metropt3" | "uploaded";
+  inputs_loaded: Record<string, boolean>;
+  rules_not_checked: string[];
+  goals_not_used: string[];
   depots: { depot_id: string; name: string }[];
   bays: Bay[];
   trains: Train[];

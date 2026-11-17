@@ -57,5 +57,15 @@ def load_dataset(db: Session) -> dict:
     return data
 
 
+def clear(db: Session) -> dict:
+    """Delete every uploaded table (config included)."""
+    counts = {}
+    for key, model in TABLES.items():
+        counts[key] = db.execute(delete(model)).rowcount
+    counts["config"] = db.execute(delete(M.Config)).rowcount
+    db.commit()
+    return counts
+
+
 def has_data(db: Session) -> bool:
     return db.scalar(select(M.Trainset).limit(1)) is not None

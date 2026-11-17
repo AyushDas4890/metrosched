@@ -1,7 +1,7 @@
 # MetroSched — Architecture
 
 CSE 471 class project based on SIH25081 (KMRL nightly train induction planning).
-All per-train operational data is **synthetic**. Network-level facts (fleet size, depot, line) come from public sources and are listed in `ASSUMPTIONS.md`.
+No synthetic data is used. The default fleet is built from real MetroPT-3 compressor data (`app/metropt_fleet.py`); real files uploaded through `/data/ingest` replace it. Inputs with no real source are left empty and the rules that need them are reported as not checked. See `ASSUMPTIONS.md`.
 
 ## Scope decisions
 
@@ -14,9 +14,11 @@ All per-train operational data is **synthetic**. Network-level facts (fleet size
 ```mermaid
 flowchart LR
   subgraph Data
-    GEN[data/generator.py<br/>seeded synthetic] --> CSV[(CSV/JSON files)]
+    MPT[(MetroPT-3<br/>real sensor windows)]
+    UP[(Uploaded real files)]
   end
-  CSV -->|POST /data/ingest| API
+  MPT --> API
+  UP -->|POST /data/ingest| API
   subgraph Backend [FastAPI backend]
     API[api routes] --> REPO[SQLAlchemy repo<br/>SQLite]
     API --> OPT[optimizer/<br/>CP-SAT model]
@@ -38,6 +40,7 @@ flowchart LR
 | `backend/optimizer/constraints.py` | Pure eligibility checks (cert validity, critical job cards) — shared by optimizer and explanations |
 | `backend/optimizer/explain.py` | Converts constraint facts + objective terms into human-readable reasons/violations |
 | `backend/optimizer/simulate.py` | Applies what-if mutations to a snapshot, re-solves, diffs plans |
+| `backend/rag/kb.py` | Retrieval-only knowledge base: chunks `data/kb/` (procedures, MetroPT-3 failure reports, past work orders), TF-IDF index, cosine ranking, per-train issue lookup |
 | `backend/ml/apu_risk.py` | Compressor (APU) fault risk: random forest on real MetroPT-3 sensor windows (`data/metropt3/`), out-of-fold scores, seeded slice per trainset |
 | `backend/ml/learner.py` | Learns soft weights from overrides (logistic regression on feature deltas); default weights if < 20 overrides |
 
@@ -67,13 +70,13 @@ Infeasible ⇒ re-solve with relaxation booleans per hard-constraint group (reve
 Ranking: revenue trains first by per-train score (objective contribution), then standby, then IBL.
 
 ### Data flow per night
-1. Ingest/seed → DB.
+1. Fleet: uploaded real files if present, else the MetroPT-3 fleet (built per request; nothing stored).
 2. `/plan/generate` → load snapshot (+ MetroPT-3 compressor risk per train) → ML weights → CP-SAT (time limit 8 s) → explanations → persist plan.
 3. Supervisor overrides via `/plan/override` → stored → learner retrains on next generate.
 4. `/plan/simulate` → copy snapshot, apply scenario mutations, solve, return diff.
 
 ### Frontend pages (Next.js App Router)
-`/` Tonight's Plan · `/fleet` Fleet Health · `/mileage` Mileage & Branding · `/depot` Depot Bay Map · `/simulate` What-If · `/overrides` Override Log. Persistent "Synthetic data" banner.
+`/` Tonight's Plan · `/fleet` Fleet Health · `/usage` Compressor Usage · `/depot` Depot · `/simulate` What-If · `/overrides` Override Log · `/knowledge` Knowledge Base. Persistent "No synthetic data" banner; pages for unloaded inputs show a "not loaded" notice.
 
 ### Testing
 pytest (constraints, optimizer, API, ML fallback, 40-train perf < 10 s), Vitest (components/utilities), Playwright smoke (generate plan in browser).

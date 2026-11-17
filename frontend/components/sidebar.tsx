@@ -9,10 +9,11 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Tonight's plan" },
   { href: "/fleet", label: "Fleet health" },
-  { href: "/mileage", label: "Mileage & branding" },
+  { href: "/usage", label: "Compressor usage" },
   { href: "/depot", label: "Depot bay map" },
   { href: "/simulate", label: "What-if simulator" },
   { href: "/overrides", label: "Override log" },
+  { href: "/knowledge", label: "Knowledge base" },
 ];
 
 export function Sidebar() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { AssignmentBadge } from "@/components/assignment-badge";
+import { NotLoaded } from "@/components/not-loaded";
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { useFleet } from "@/lib/use-fleet";
@@ -29,7 +30,7 @@ export default function DepotMap() {
 
   return (
     <div>
-      <PageHeader title={`Depot bay map: ${depot.name}`} />
+      <PageHeader title={`Depot: ${depot.name}`} />
       <ul className="mb-4 flex flex-wrap gap-3" aria-label="Legend">
         {(["REVENUE", "STANDBY", "IBL"] as Assignment[]).map((a) => (
           <li key={a}>
@@ -38,6 +39,7 @@ export default function DepotMap() {
         ))}
       </ul>
 
+      {fleet.inputs_loaded.bays ? (
       <section aria-labelledby="stab" className="mb-8 rounded-xl border bg-card p-5">
         <h2 id="stab" className="mb-1 font-condensed text-2xl font-bold">
           Stabling lines tonight
@@ -76,6 +78,11 @@ export default function DepotMap() {
           ))}
         </div>
       </section>
+      ) : (
+        <div className="mb-8">
+          <NotLoaded what="stabling bay" effect="Bay positions and shunting moves cannot be shown or planned." />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section aria-labelledby="ibl" className="rounded-xl border bg-card p-5">
@@ -85,11 +92,12 @@ export default function DepotMap() {
           <ul className="space-y-1 text-sm">
             {ibl.map((i) => (
               <li key={i.train_id}>
-                <span className="font-semibold">{i.train_id}</span>: {i.reasons.slice(1).find((r) => !r.startsWith("All fitness")) ?? i.reasons[0]}
+                <span className="font-semibold">{i.train_id}</span>: {i.reasons[0]}
               </li>
             ))}
           </ul>
         </section>
+        {fleet.inputs_loaded.bays ? (
         <section aria-labelledby="sh" className="rounded-xl border bg-card p-5">
           <h2 id="sh" className="mb-2 font-condensed text-2xl font-bold">
             Shunting moves needed ({shunts.length})
@@ -104,6 +112,9 @@ export default function DepotMap() {
             </ul>
           )}
         </section>
+        ) : (
+          <NotLoaded what="stabling bay" effect="Shunting is not part of the plan." />
+        )}
       </div>
     </div>
   );

@@ -2,18 +2,22 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from fixture_data import generate
 
 
 @pytest.fixture
 def client(tmp_path):
+    """API loaded with the test-only fixture through /data/ingest, the same path real uploads take."""
     c = TestClient(create_app(f"sqlite:///{tmp_path / 't.db'}"))
-    assert c.post("/data/seed").status_code == 200
+    assert c.post("/data/ingest", json=generate(25, 1, 471)).status_code == 200
     return c
 
 
-def test_generate_before_seed_is_409(tmp_path):
+def test_without_uploads_the_fleet_comes_from_metropt3(tmp_path):
     c = TestClient(create_app(f"sqlite:///{tmp_path / 'e.db'}"))
-    assert c.post("/plan/generate", json={}).status_code == 409
+    plan = c.post("/plan/generate", json={}).json()
+    assert plan["feasible"] and plan["data_source"] == "metropt3" and len(plan["items"]) == 25
+    assert len(plan["rules_not_checked"]) == 3
 
 
 def test_generate_plan(client):

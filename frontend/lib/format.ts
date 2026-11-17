@@ -28,10 +28,12 @@ export function expiryTone(days: number | null): "expired" | "soon" | "ok" {
   return "ok";
 }
 
+/** Distance of each train's mileage from the fleet mean; trains without uploaded mileage are left out. */
 export function mileageDeviation(trains: Train[]): { train_id: string; deviation: number }[] {
-  if (!trains.length) return [];
-  const mean = trains.reduce((s, t) => s + t.cumulative_km, 0) / trains.length;
-  return trains
+  const known = trains.filter((t): t is Train & { cumulative_km: number } => t.cumulative_km !== null);
+  if (!known.length) return [];
+  const mean = known.reduce((s, t) => s + t.cumulative_km, 0) / known.length;
+  return known
     .map((t) => ({ train_id: t.train_id, deviation: Math.round(t.cumulative_km - mean) }))
     .sort((a, b) => a.deviation - b.deviation);
 }

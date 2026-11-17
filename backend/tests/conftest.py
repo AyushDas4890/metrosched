@@ -5,9 +5,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
-sys.path.insert(0, str(ROOT / "data"))
 
-from generator import generate  # noqa: E402
+from fixture_data import generate  # noqa: E402  (test-only synthetic fixture)
 from optimizer.snapshot import FleetSnapshot  # noqa: E402
 
 

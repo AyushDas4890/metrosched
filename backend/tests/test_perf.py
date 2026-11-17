@@ -1,6 +1,6 @@
 import time
 
-from generator import generate
+from fixture_data import generate
 from optimizer.constraints import check_plan
 from optimizer.model import solve
 from optimizer.snapshot import FleetSnapshot

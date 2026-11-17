@@ -9,6 +9,8 @@ import { ErrorNote, PageHeader } from "@/components/page-header";
 import { TrainPlate } from "@/components/train-plate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KbRelated } from "@/components/kb-related";
+import { CoverageNote } from "@/components/not-loaded";
 import { api } from "@/lib/api";
 import { ASSIGNMENT_LABEL, countBy } from "@/lib/format";
 import { LAYOUT_SPRING } from "@/lib/motion";
@@ -41,13 +43,7 @@ export default function TonightsPlan() {
     setBusy(true);
     setError(null);
     try {
-      try {
-        setPlan(await api.generate());
-      } catch (e) {
-        if (!(e as Error).message.includes("No fleet data")) throw e;
-        await api.seed();
-        setPlan(await api.generate());
-      }
+      setPlan(await api.generate());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -73,6 +69,8 @@ export default function TonightsPlan() {
       </PageHeader>
 
       {error && <ErrorNote message={error} />}
+
+      {plan && <CoverageNote rules={plan.rules_not_checked ?? []} goals={plan.goals_not_used ?? []} />}
 
       {!plan && !error && (
         <p className="max-w-prose text-muted-foreground">
@@ -163,7 +161,13 @@ export default function TonightsPlan() {
 
 /** The most train-specific reason: skips the generic headline and the "all certificates valid" line. */
 function keyReason(item: PlanItem): string {
-  return item.reasons.slice(1).find((r) => !r.startsWith("All fitness")) ?? item.reasons[0];
+  return item.reasons.slice(1).find((r) => !r.startsWith("All fitness") && !isLowCompressorRisk(r)) ?? item.reasons[0];
+}
+
+/** A compressor-risk line below the 50% alert level is routine, so it never becomes the headline reason. */
+function isLowCompressorRisk(reason: string): boolean {
+  const m = reason.match(/^Compressor \(APU\) fault risk (\d+)%/);
+  return m !== null && Number(m[1]) < 50;
 }
 
 function PlanRow({
@@ -234,6 +238,10 @@ function PlanRow({
                 )}
               </div>
               <OverrideForm item={item} planId={planId} onDone={onOverridden} />
+              <div className="md:col-span-2">
+                <h3 className="mb-2 font-semibold">From the knowledge base</h3>
+                <KbRelated trainId={item.train_id} />
+              </div>
             </div>
           </motion.div>
         )}

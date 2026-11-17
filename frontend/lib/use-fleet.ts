@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { FleetStatus, Plan } from "./types";
 
-/** Loads fleet status and (optionally) the latest plan. Seeds the backend once if it is empty. */
+/** Loads fleet status and (optionally) the latest plan. With no uploads, the backend serves the MetroPT-3 fleet. */
 export function useFleet(withPlan = false) {
   const [fleet, setFleet] = useState<FleetStatus | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -13,14 +13,7 @@ export function useFleet(withPlan = false) {
   useEffect(() => {
     (async () => {
       try {
-        let f: FleetStatus;
-        try {
-          f = await api.fleet();
-        } catch (e) {
-          if (!(e as Error).message.includes("No fleet data")) throw e;
-          await api.seed();
-          f = await api.fleet();
-        }
+        const f: FleetStatus = await api.fleet();
         setFleet(f);
         if (withPlan) {
           const hist = await api.history();
