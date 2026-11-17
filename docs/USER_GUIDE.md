@@ -1,6 +1,6 @@
 # MetroSched user guide
 
-This guide is for the depot supervisor preparing tomorrow's induction between 21:00 and 23:00. All data is synthetic.
+This guide is for the depot supervisor preparing tomorrow's induction between 21:00 and 23:00. Planning data is synthetic; compressor sensor data is real (MetroPT-3, Metro do Porto).
 
 ## 1. Generate tonight's plan
 Open **Tonight's plan** and select **Generate plan**. If no data is loaded yet, the seeded data is loaded automatically.
@@ -24,6 +24,8 @@ An unfit train cannot be moved out of IBL. Overrides appear on the **Override lo
 
 ## 3. Check fleet health
 **Fleet health** charts how many days remain until each train's earliest certificate expires. Expand **Show certificate table** to see all three certificates per train. The page also lists open Maximo job cards, with critical ones first.
+
+The **Compressor (APU) fault risk** chart shows each train's risk, scored from a slice of real air-compressor readings (MetroPT-3). At 50% or more the train gets an alert on Tonight's plan and the optimizer prefers to keep it out of revenue. Below the chart: how well the model caught the real reported failures, and a table of each train's sensor slice. Treat the risk as a prompt to inspect, not a verdict: the model misses some failures and raises some false alarms.
 
 ## 4. Mileage and branding
 - **Mileage chart**: each train's distance from the fleet mean. Below the mean is blue; above is amber.

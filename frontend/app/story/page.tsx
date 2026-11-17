@@ -122,7 +122,7 @@ export default function Story() {
       {/* Hero */}
       <section className="flex min-h-screen flex-col justify-center px-5 md:px-16">
         <p className="hero-sub mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-standby/40 bg-standby/10 px-3 py-1 text-sm text-standby-ink">
-          CSE 471 project · synthetic data
+          CSE 471 project · synthetic planning data · real compressor data
         </p>
         <h1 className="display font-condensed text-[clamp(3.5rem,11vw,10rem)] font-bold uppercase">
           <span className="block overflow-hidden"><span className="hero-line block">Every train,</span></span>
@@ -217,7 +217,7 @@ export default function Story() {
           Open tonight&apos;s plan
         </Link>
         <p className="max-w-md text-sm text-muted-foreground">
-          All per-train data is synthetic. Assumptions are listed in docs/ASSUMPTIONS.md.
+          Planning data is synthetic; compressor sensor data is real (MetroPT-3, CC BY 4.0). Assumptions are listed in docs/ASSUMPTIONS.md.
         </p>
       </section>
     </div>

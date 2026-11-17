@@ -38,6 +38,7 @@ flowchart LR
 | `backend/optimizer/constraints.py` | Pure eligibility checks (cert validity, critical job cards) — shared by optimizer and explanations |
 | `backend/optimizer/explain.py` | Converts constraint facts + objective terms into human-readable reasons/violations |
 | `backend/optimizer/simulate.py` | Applies what-if mutations to a snapshot, re-solves, diffs plans |
+| `backend/ml/apu_risk.py` | Compressor (APU) fault risk: random forest on real MetroPT-3 sensor windows (`data/metropt3/`), out-of-fold scores, seeded slice per trainset |
 | `backend/ml/learner.py` | Learns soft weights from overrides (logistic regression on feature deltas); default weights if < 20 overrides |
 
 ### Optimization model
@@ -56,7 +57,10 @@ Soft objective (weighted, integer-scaled):
 - branding shortfall hours for wrapped trains not in revenue,
 - mileage deviation: revenue trains with km above fleet mean penalised, below rewarded,
 - shunting moves: trains whose bay position blocks morning turnout for revenue,
-- standby buffer bonus above minimum.
+- standby buffer bonus above minimum,
+- compressor fault risk (MetroPT-3) for trains in revenue (weight 500).
+
+The solver runs on one worker thread so tied optima resolve the same way each run.
 
 Infeasible ⇒ re-solve with relaxation booleans per hard-constraint group (revenue target, cleaning capacity, IBL capacity); report the minimal set relaxed. Certificate / job-card rules are never relaxed — they reduce the available fleet instead.
 
@@ -64,7 +68,7 @@ Ranking: revenue trains first by per-train score (objective contribution), then 
 
 ### Data flow per night
 1. Ingest/seed → DB.
-2. `/plan/generate` → load snapshot → ML weights → CP-SAT (time limit 8 s) → explanations → persist plan.
+2. `/plan/generate` → load snapshot (+ MetroPT-3 compressor risk per train) → ML weights → CP-SAT (time limit 8 s) → explanations → persist plan.
 3. Supervisor overrides via `/plan/override` → stored → learner retrains on next generate.
 4. `/plan/simulate` → copy snapshot, apply scenario mutations, solve, return diff.
 

@@ -8,6 +8,7 @@ from .constraints import (CERT_LABEL, IBL, REVENUE, STANDBY, cleaning_due, expir
 from .snapshot import FleetSnapshot
 
 EXPIRY_WARN_DAYS = 2
+APU_ALERT_AT = 0.5
 
 
 def explain(snap: FleetSnapshot, train: dict, assignment: dict[str, str], mean_km: float) -> tuple[list[str], list[str]]:
@@ -42,6 +43,15 @@ def explain(snap: FleetSnapshot, train: dict, assignment: dict[str, str], mean_k
         if a != REVENUE and br["hours_shortfall_7d"] > 0:
             alerts.append(f"Branding shortfall grows: {br['advertiser']} train not in revenue")
 
+    apu = snap.apu.get(tid)
+    if apu:
+        pct = round(apu["risk"] * 100)
+        where = f"MetroPT-3 sensor slice {apu['slice_start']} to {apu['slice_end']}"
+        if apu["risk"] >= APU_ALERT_AT:
+            alerts.append(f"Compressor (APU) fault risk {pct}% ({where}); inspect the air system before service")
+        reasons.append(f"Compressor (APU) fault risk {pct}% from real {where}"
+                       + ("; a reported air leak falls in this slice" if apu.get("reported_failure_in_slice") else ""))
+
     delta = train["cumulative_km"] - mean_km
     word = "above" if delta > 0 else "below"
     reasons.append(f"Mileage {train['cumulative_km']:,} km is {abs(delta):,.0f} km {word} fleet mean")
@@ -67,7 +77,10 @@ def explain(snap: FleetSnapshot, train: dict, assignment: dict[str, str], mean_k
     elif a == REVENUE:
         reasons.insert(0, "Fit for service and selected for revenue")
     elif not (expired_certificates(snap, tid) or missing_certificates(snap, tid) or open_critical_jobs(snap, tid)):
-        reasons.insert(0, "Fit, but sent to IBL for preventive maintenance")
+        if apu and apu["risk"] >= APU_ALERT_AT:
+            reasons.insert(0, "Certificates and job cards allow service, but sent to IBL: high compressor (APU) fault risk")
+        else:
+            reasons.insert(0, "Fit, but sent to IBL for preventive maintenance")
     else:
         reasons.insert(0, "Not fit for service; must go to Inspection Bay Line")
     return reasons, alerts

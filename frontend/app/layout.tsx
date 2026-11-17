@@ -12,7 +12,7 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: "MetroSched",
-  description: "Nightly train induction planning for a metro depot (synthetic data, CSE 471 project)",
+  description: "Nightly train induction planning for a metro depot (synthetic planning data, real MetroPT-3 compressor data; CSE 471 project)",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

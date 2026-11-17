@@ -8,7 +8,7 @@ const item = (id: string, assignment: PlanItem["assignment"]): PlanItem => ({
 
 const train = (id: string, kmv: number, days: number[]): Train => ({
   train_id: id, depot_id: "D1", cars: 3, cumulative_km: kmv, bay_id: "B", days_since_cleaning: 0, fit: true,
-  cleaning_due: false, expired: [], job_cards: [], critical_open: 0, branding: null,
+  cleaning_due: false, expired: [], job_cards: [], critical_open: 0, branding: null, apu: null,
   certificates: days.map((d, i) => ({ train_id: id, kind: `K${i}`, label: `K${i}`, valid_until: "2026-11-01", days_left: d })),
 });
 

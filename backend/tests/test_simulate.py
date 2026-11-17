@@ -38,13 +38,15 @@ def _diff(snap, scenario):
     return r["scenario"], {(c["train_id"], c["before"], c["after"]) for c in r["changes"]}
 
 
-def test_readme_scenarios(snap25):
-    _, d = _diff(snap25, {"type": "cert_expire", "train_id": "TS-07", "kind": "ROLLING_STOCK"})
-    assert d == {("TS-07", "REVENUE", "IBL"), ("TS-04", "IBL", "REVENUE")}
-    _, d = _diff(snap25, {"type": "critical_job", "train_id": "TS-22"})
-    assert d == {("TS-22", "REVENUE", "IBL"), ("TS-04", "IBL", "REVENUE")}
-    _, d = _diff(snap25, {"type": "required_revenue", "value": 16})
-    assert {("TS-02", "REVENUE", "STANDBY"), ("TS-13", "REVENUE", "STANDBY"), ("TS-17", "REVENUE", "STANDBY")} <= d
-    res, _ = _diff(snap25, {"type": "crews_absent", "count": 1})
+def test_readme_scenarios(snap25_apu):
+    """The four what-if scenarios documented in README.md, on the fleet as the API sees it (with MetroPT-3 risk)."""
+    snap = snap25_apu
+    _, d = _diff(snap, {"type": "cert_expire", "train_id": "TS-07", "kind": "ROLLING_STOCK"})
+    assert d == {("TS-07", "REVENUE", "IBL"), ("TS-04", "STANDBY", "REVENUE"), ("TS-21", "IBL", "STANDBY")}
+    _, d = _diff(snap, {"type": "critical_job", "train_id": "TS-22"})
+    assert d == {("TS-22", "REVENUE", "IBL"), ("TS-04", "STANDBY", "REVENUE"), ("TS-21", "IBL", "STANDBY")}
+    _, d = _diff(snap, {"type": "required_revenue", "value": 16})
+    assert d == {("TS-09", "REVENUE", "STANDBY"), ("TS-20", "REVENUE", "STANDBY"), ("TS-04", "STANDBY", "IBL")}
+    res, _ = _diff(snap, {"type": "crews_absent", "count": 1})
     assert not res.feasible
-    assert any(r["constraint"] == "cleaning_slots" and r["relax_by"] == 2 for r in res.relaxations)
+    assert any(r["relax_by"] == 2 for r in res.relaxations if r["constraint"] != "info")

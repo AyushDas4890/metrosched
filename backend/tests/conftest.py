@@ -19,3 +19,11 @@ def data25():
 @pytest.fixture
 def snap25(data25):
     return FleetSnapshot.from_dict(data25)
+
+
+@pytest.fixture
+def snap25_apu(data25):
+    """The seeded fleet as the API sees it: with real MetroPT-3 compressor risk attached."""
+    from ml.apu_risk import assign_slices
+    data25["apu"] = assign_slices([t["train_id"] for t in data25["trainsets"]])
+    return FleetSnapshot.from_dict(data25)

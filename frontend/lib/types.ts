@@ -68,6 +68,33 @@ export interface Train {
   job_cards: JobCard[];
   critical_open: number;
   branding: Branding | null;
+  apu: ApuRisk | null;
+}
+
+/** Compressor (APU) failure risk from real MetroPT-3 sensor data mapped onto this trainset. */
+export interface ApuRisk {
+  risk: number;
+  slice_start: string;
+  slice_end: string;
+  peak_window: string;
+  reported_failure_in_slice: boolean;
+  source: string;
+}
+
+export interface ApuModel {
+  source: string;
+  alert_threshold: number;
+  slice_hours: number;
+  metrics: {
+    windows: number;
+    failure_windows: number;
+    roc_auc: number;
+    average_precision: number;
+    recall_at_0_5: number;
+    false_alarm_rate_at_0_5: number;
+    events_detected: number;
+    events: number;
+  };
 }
 
 export interface Bay {

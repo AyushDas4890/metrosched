@@ -20,6 +20,7 @@ class FleetSnapshot:
     certificates: dict[str, list[dict]] = field(default_factory=dict)
     job_cards: dict[str, list[dict]] = field(default_factory=dict)
     branding: dict[str, dict] = field(default_factory=dict)
+    apu: dict[str, dict] = field(default_factory=dict)  # compressor risk from MetroPT-3 (ml/apu_risk.py)
 
     @classmethod
     def from_dict(cls, data: dict) -> "FleetSnapshot":
@@ -43,6 +44,7 @@ class FleetSnapshot:
             certificates=certs,
             job_cards=jobs,
             branding={b["train_id"]: b for b in data["branding"]},
+            apu=dict(data.get("apu", {})),
         )
 
     def copy(self) -> "FleetSnapshot":

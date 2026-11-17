@@ -9,3 +9,5 @@ frontend/playwright-report/
 .claude-flow/
 .pytest_cache/
 .swarm/
+data/metropt3/raw/
+data/metropt3/*.zip

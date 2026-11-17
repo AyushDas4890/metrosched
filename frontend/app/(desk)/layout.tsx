@@ -10,7 +10,7 @@ export default function DeskLayout({ children }: Readonly<{ children: React.Reac
           className="mb-6 inline-flex items-center gap-2 rounded-full border border-standby/40 bg-standby/10 px-3 py-1 text-sm text-standby-ink"
         >
           <span aria-hidden="true">●</span>
-          All train data shown here is synthetic. It does not reflect real KMRL operations.
+          Planning data shown here is synthetic and does not reflect real KMRL operations. Compressor sensor data (Fleet health) is real: MetroPT-3, Metro do Porto.
         </p>
         {children}
       </main>

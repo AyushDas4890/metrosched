@@ -1,4 +1,4 @@
-"""MetroSched FastAPI app. All data is synthetic (see docs/ASSUMPTIONS.md)."""
+"""MetroSched FastAPI app. Planning data is synthetic; compressor data is real MetroPT-3 (see docs/ASSUMPTIONS.md)."""
 from __future__ import annotations
 
 import os
@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "data"))
 sys.path.insert(0, str(ROOT / "backend"))
 
 from generator import generate  # noqa: E402
+from ml import apu_risk  # noqa: E402
 from ml.learner import features, learn_weights  # noqa: E402
 from optimizer.constraints import (CERT_LABEL, cleaning_due, expired_certificates, is_fit,  # noqa: E402
                                    open_critical_jobs)
@@ -33,7 +34,7 @@ ITEM_FIELDS = ("train_id", "depot_id", "assignment", "rank", "score", "reasons",
 
 def create_app(db_url: str | None = None) -> FastAPI:
     SessionLocal = make_session_factory(make_engine(db_url))
-    app = FastAPI(title="MetroSched", description="KMRL induction planning (synthetic data)")
+    app = FastAPI(title="MetroSched", description="KMRL induction planning (synthetic planning data, real MetroPT-3 compressor data)")
     app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
                        allow_methods=["*"], allow_headers=["*"])
 
@@ -44,7 +45,10 @@ def create_app(db_url: str | None = None) -> FastAPI:
     def snapshot(db: Session) -> FleetSnapshot:
         if not repo.has_data(db):
             raise HTTPException(409, "No fleet data loaded. POST /data/seed or /data/ingest first.")
-        return FleetSnapshot.from_dict(repo.load_dataset(db))
+        data = repo.load_dataset(db)
+        # Real MetroPT-3 compressor data, mapped onto the trainsets (see ml/apu_risk.py).
+        data["apu"] = apu_risk.assign_slices([t["train_id"] for t in data["trainsets"]])
+        return FleetSnapshot.from_dict(data)
 
     def learned(db: Session):
         overrides = [{"features": o.features, "to_assignment": o.to_assignment} for o in db.scalars(select(M.Override))]
@@ -67,7 +71,7 @@ def create_app(db_url: str | None = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "synthetic_data": True}
+        return {"status": "ok", "synthetic_data": True, "real_data": ["MetroPT-3 compressor sensors"]}
 
     @app.post("/data/seed")
     def seed(trains: int = 25, depots: int = 1, seed: int = 471, db: Session = Depends(get_db)):
@@ -183,12 +187,22 @@ def create_app(db_url: str | None = None) -> FastAPI:
                 "job_cards": snap.job_cards.get(tid, []),
                 "critical_open": len(open_critical_jobs(snap, tid)),
                 "branding": snap.branding.get(tid),
+                "apu": snap.apu.get(tid),
             })
-        return {"service_date": snap.service_date.isoformat(), "synthetic_data": True,
+        return {"service_date": snap.service_date.isoformat(), "synthetic_data": True, "real_data": ["MetroPT-3 compressor sensors"],
                 "config": {"required_revenue": snap.required_revenue, "min_standby": snap.min_standby,
                            "cleaning_slots": snap.cleaning_slots, "ibl_capacity": snap.ibl_capacity,
                            "cleaning_due_days": snap.cleaning_due_days},
                 "depots": snap.depots, "bays": list(snap.bays.values()), "trains": trains}
+
+    @app.get("/apu/model")
+    def apu_model():
+        """How well the compressor risk model detects the real reported failures (out-of-fold)."""
+        scores = apu_risk.load_scores()
+        if scores is None:
+            raise HTTPException(404, "MetroPT-3 data not prepared. Run data/metropt3/prepare.py.")
+        return {"source": apu_risk.SOURCE, "alert_threshold": apu_risk.ALERT_AT,
+                "slice_hours": apu_risk.SLICE_WINDOWS / 2, "metrics": apu_risk.evaluate(scores)}
 
     @app.get("/ml/weights")
     def ml_weights(db: Session = Depends(get_db)):

@@ -1,6 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ApuRiskSection } from "@/components/apu-risk-section";
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { TrainPlate } from "@/components/train-plate";
 import { earliestExpiry, expiryTone } from "@/lib/format";
@@ -90,6 +91,8 @@ export default function FleetHealth() {
           </div>
         </details>
       </section>
+
+      <ApuRiskSection trains={fleet.trains} />
 
       <section aria-labelledby="jobs" className="rounded-xl border bg-card p-5">
         <h2 id="jobs" className="mb-3 font-condensed text-2xl font-bold">

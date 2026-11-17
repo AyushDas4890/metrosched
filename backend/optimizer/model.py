@@ -9,7 +9,8 @@ from .constraints import ASSIGNMENTS, IBL, REVENUE, STANDBY, cleaning_due, is_fi
 from .explain import explain
 from .snapshot import FleetSnapshot
 
-DEFAULT_WEIGHTS = {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0, "maintenance": 4.0}
+DEFAULT_WEIGHTS = {"branding": 10.0, "mileage": 2.0, "shunting": 5.0, "standby": 3.0, "maintenance": 4.0,
+                   "apu_risk": 500.0}
 TIME_LIMIT_S = 8.0
 RELAX_PENALTY = 1_000_000
 
@@ -50,6 +51,11 @@ def shunt_pairs(snap: FleetSnapshot) -> list[tuple[str, str]]:
     return pairs
 
 
+def apu_risk(snap: FleetSnapshot, train_id: str) -> float:
+    """Compressor failure risk in [0, 1] from MetroPT-3 sensor data; 0 when no sensor data is attached."""
+    return float(snap.apu.get(train_id, {}).get("risk", 0.0))
+
+
 def candidate_score(snap: FleetSnapshot, train: dict, weights: dict, mean_km: float) -> float:
     """Assignment-independent desirability for revenue service; used for ranking and per-train score."""
     tid = train["train_id"]
@@ -62,6 +68,7 @@ def candidate_score(snap: FleetSnapshot, train: dict, weights: dict, mean_km: fl
     if bay and bay["kind"] == "STABLING":
         s -= weights["shunting"] * (bay["position"] - 1)
     s -= weights["maintenance"] * len(open_noncritical_jobs(snap, tid))
+    s -= weights["apu_risk"] * apu_risk(snap, tid) / 10
     if not is_fit(snap, tid):
         s -= 100
     return round(s, 1)
@@ -101,6 +108,7 @@ def _build(snap: FleetSnapshot, weights: dict, relax: bool):
             need = br["min_hours_per_day"] + br["hours_shortfall_7d"]
             terms.append(int(weights["branding"] * need) * (1 - x[t, REVENUE]))
         terms.append(int(weights["mileage"] * (tr["cumulative_km"] - mean_km) / 1000) * x[t, REVENUE])
+        terms.append(int(weights["apu_risk"] * apu_risk(snap, t)) * x[t, REVENUE])
         terms.append(-int(weights["standby"] * 10) * x[t, STANDBY])
         if is_fit(snap, t):
             jobs = len(open_noncritical_jobs(snap, t))
@@ -120,7 +128,7 @@ def solve(snap: FleetSnapshot, weights: dict | None = None) -> PlanResult:
     m, x, _, mean_km = _build(snap, weights, relax=False)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = TIME_LIMIT_S
-    solver.parameters.num_workers = 8
+    solver.parameters.num_workers = 1  # single worker: tied optima always resolve the same way
     status = solver.solve(m)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return _relaxation_report(snap, weights)
@@ -141,7 +149,7 @@ def _relaxation_report(snap: FleetSnapshot, weights: dict) -> PlanResult:
     m, _, slack, _ = _build(snap, weights, relax=True)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = TIME_LIMIT_S
-    solver.parameters.num_workers = 8
+    solver.parameters.num_workers = 1  # single worker: tied optima always resolve the same way
     status = solver.solve(m)
     relax = []
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
