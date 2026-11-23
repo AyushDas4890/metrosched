@@ -137,7 +137,7 @@ textarea {
   }
 }
 
-/* Background after Instrument: black field, warm off-white band, a big olive sun rising, film grain. */
+/* Background after Instrument: black field, warm off-white band, a soft olive wash, film grain. */
 body::before,
 body::after {
   content: "";
@@ -148,7 +148,7 @@ body::after {
 }
 body::before {
   background:
-    radial-gradient(circle 34vmax at 92% 92%, rgb(107 122 46 / 0.95) 0 60%, rgb(154 171 74 / 0.5) 72%, transparent 74%),
+    linear-gradient(160deg, transparent 40%, rgb(107 122 46 / 0.28) 100%),
     linear-gradient(180deg, transparent 0 58%, rgb(245 238 226 / 0.06) 58% 64%, transparent 64%),
     radial-gradient(60vmax 40vmax at 10% -10%, rgb(255 255 255 / 0.10), transparent 70%);
   animation: sun-rise 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
