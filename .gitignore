@@ -13,3 +13,5 @@ data/metropt3/raw/
 data/metropt3/*.zip
 
 backend/kb_answer_audit.jsonl
+
+.vercel

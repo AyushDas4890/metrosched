@@ -1,0 +1,9 @@
+frontend
+docs
+presentation
+.venv
+**/__pycache__
+**/*.db
+data/metropt3/*.zip
+data/metropt3/raw
+backend/tests
