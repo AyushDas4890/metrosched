@@ -24,7 +24,7 @@ const H = (s, t, kicker) => {
 const box = (s, x, y, w, h, fill = CARD, o = {}) =>
   s.addShape(pres.shapes.ROUNDED_RECTANGLE, { objectName: nm(), x, y, w, h, fill: { color: fill }, line: { color: LINE, width: 1 }, rectRadius: 0.12, ...o });
 // Morph actor: the olive accent bar moves between slides.
-const actors = (s, sun, bar) => {
+const actors = (s, _unused, bar) => {
   s.addShape(pres.shapes.RECTANGLE, { objectName: "!!bar", ...bar, fill: { color: OLIVE }, line: { type: "none" } });
 };
 const ALL = [];
@@ -219,20 +219,32 @@ const card = (s, x, y, w, h, head, body, accent = OLIVE) => {
   T(s, "It only reads what was really saved: nothing is guessed.", { x: 0.7, y: 6.7, w: 11.8, h: 0.4, fontSize: 14, color: MUTED });
 }
 
-// 11. Fault notes + guardrails
+// 11. RAG: fault-note answers + guardrails
 {
   const s = slide();
-  actors(s, { x: -1.6, y: -1.6, w: 4, h: 4 }, { x: 0.7, y: 1.75, w: 8.4, h: 0.06 });
-  H(s, "Ask about faults: answers only from real notes", "Agent safety");
-  const steps = [["Check the question", "Tricks or 'make up a record' are refused"], ["Find notes", "Top 4 matching passages from 10 real notes"], ["Write the answer", "Claude answers in 2–4 sentences, citing a note"], ["Check the answer", "No citation → answer hidden, notes shown"]];
-  steps.forEach(([h, d], i) => {
-    const x = 0.7 + i * 3.05;
-    box(s, x, 2.35, 2.8, 2.5);
-    T(s, String(i + 1), { x: x + 0.3, y: 2.5, w: 1, h: 0.6, fontFace: "Arial", fontSize: 28, bold: true, color: OLIVE });
-    T(s, h, { x: x + 0.3, y: 3.15, w: 2.3, h: 0.5, fontFace: "Arial", fontSize: 17, bold: true });
-    T(s, d, { x: x + 0.3, y: 3.65, w: 2.3, h: 1.1, fontSize: 14, color: MUTED });
+  actors(s, null, { x: 0.7, y: 1.75, w: 8.4, h: 0.06 });
+  H(s, "RAG: answers built only from real fault notes", "Retrieval-augmented generation");
+  const steps = [
+    ["✓", "Check input", "Tricks or 'make up a record' are refused before the AI sees them", MUTED],
+    ["R", "Retrieve", "TF-IDF keyword search over 10 real MetroPT-3 notes; keep the top 4", OLIVE],
+    ["A", "Augment", "Put those 4 notes into Claude's prompt as documents", OLIVE],
+    ["G", "Generate", "Claude writes 2–4 sentences and must cite the note it used", OLIVE],
+    ["✓", "Check output", "No citation → answer hidden, real notes shown; every question logged", MUTED],
+  ];
+  steps.forEach(([k, h, d, c], i) => {
+    const x = 0.7 + i * 2.44;
+    box(s, x, 2.25, 2.25, 2.85);
+    T(s, k, { x: x + 0.25, y: 2.38, w: 1.2, h: 0.75, fontFace: "Arial", fontSize: 36, bold: true, color: c });
+    T(s, h, { x: x + 0.25, y: 3.15, w: 1.85, h: 0.45, fontFace: "Arial", fontSize: 16, bold: true });
+    T(s, d, { x: x + 0.25, y: 3.6, w: 1.85, h: 1.45, fontSize: 12, color: MUTED });
+    if (i < 4) s.addShape(pres.shapes.CHEVRON, { objectName: nm(), x: x + 2.28, y: 3.5, w: 0.13, h: 0.26, fill: { color: OLIVE }, line: { type: "none" } });
   });
-  T(s, "Tested on 13 labelled questions: the safety checks were right every time (1.0) and the right note was always in the top 4 (1.0). Every question is logged.", { x: 0.7, y: 5.25, w: 11.8, h: 1.0, fontSize: 17 });
+  box(s, 0.7, 5.4, 5.85, 1.35, "1B1F12", { line: { color: DEEP, width: 1 } });
+  T(s, "Tested on 13 labelled questions", { x: 0.95, y: 5.52, w: 5.4, h: 0.35, fontFace: "Arial", fontSize: 14, bold: true, color: OLIVE });
+  T(s, "Safety checks right every time: 1.0\nRight note in the top 4 (hit@4): 1.0", { x: 0.95, y: 5.9, w: 5.4, h: 0.8, fontSize: 14 });
+  box(s, 6.75, 5.4, 5.85, 1.35);
+  T(s, "Limits", { x: 7.0, y: 5.52, w: 5.4, h: 0.35, fontFace: "Arial", fontSize: 14, bold: true, color: OLIVE });
+  T(s, "Keyword search, small library (10 notes).\nWritten answers need an API key; without it, only notes are shown.", { x: 7.0, y: 5.9, w: 5.4, h: 0.8, fontSize: 13, color: MUTED });
 }
 
 // ---------- presenter script: super simple English, one note per slide ----------
@@ -247,7 +259,7 @@ const SCRIPT = [
   "Here is a real example from our data.\n\nTS-08 is number 1. It has zero fault risk and does little work, so its score is 53.5.\n\nTS-21 is last. Its fault chance is 94 percent, and it works much harder than the others. So 50 minus 47 minus 7.6 gives minus 4.3.\n\nOne more thing: TS-22 has a score of 27.3. TS-16 has 34.5. But even if a standby train had a higher score, it would still be listed below every train in service. The place comes first, and the score comes second.",
   "What if the supervisor does not agree with the plan?\n\nThe supervisor can move any train and must type a reason.\n\nIn this example, the supervisor moved TS-12 from service to maintenance, with the reason 'brake check'.\n\nThen the solver runs again. It keeps TS-12 locked in maintenance. To keep 18 trains in service, it automatically brings TS-22 from standby into service.\n\nEvery change is saved. After 20 changes, a second machine learning model, called logistic regression, studies these changes and adjusts the goals. So the planner slowly learns the supervisors' habits.",
   "This is our newest part: the agent remembers.\n\nThink of a good shift supervisor. Before deciding, they remember what happened last week. Our planner does the same.\n\nIt works in four steps.\nSave: every plan and every supervisor change is stored.\nLook back: for each train, it reads where the train was in the last 5 plans, and its change log.\nSpot patterns: did the train move? Is it in the same place again? Has it gone to maintenance many times?\nTell: it writes short notes under the train, and shows a 'History' tag.\n\nIn this example, the train went to maintenance in plan 3 after a brake check, and it is still there tonight. So the planner says: it has been in maintenance in 2 of the last 4 plans, so it may need a deeper check.\n\nIt only reads what was really saved. It never guesses.",
-  "Last, staff can ask questions about faults, like: 'What does low pressure mean?'\n\nWe keep the answers safe in four steps.\nOne: we check the question. Tricks, or requests to make up records, are refused.\nTwo: we find the 4 best matching notes from 10 real fault notes.\nThree: Claude, an AI model, writes a short answer using only those notes, and it must point to the note it used.\nFour: we check the answer. If it has no source, we do not show it. We show the real notes instead.\n\nWe tested this with 13 questions. The safety checks were correct every time, and the right note was always found.\n\nThank you. We are happy to take your questions.",
+  "Our last part uses RAG. RAG means Retrieval-Augmented Generation. In simple words: first find the right facts, then let the AI answer using only those facts.\n\nStaff can ask a question, like: 'What does low pressure mean?'\n\nFirst, we check the question. If it tries to trick the AI, or asks it to make up a record, we refuse it.\n\nR is for Retrieve. We search 10 real fault notes from the MetroPT-3 data, and keep the 4 that match best. The search compares the words in the question with the words in each note. This is called TF-IDF.\n\nA is for Augment. We give those 4 notes to the AI, Claude, together with the question.\n\nG is for Generate. Claude writes a short answer, 2 to 4 sentences, using only those notes. It must show which note it used. This is called a citation.\n\nLast, we check the answer. If there is no citation, we do not show it. We show the real notes instead. Every question is saved in a log.\n\nWe tested it with 13 questions. The safety checks were right every time, and the right note was always in the top 4.\n\nThank you. We are happy to take your questions.",
 ];
 if (SCRIPT.length !== ALL.length) throw new Error(`script has ${SCRIPT.length} notes for ${ALL.length} slides`);
 ALL.forEach((s, i) => s.addNotes(SCRIPT[i]));
