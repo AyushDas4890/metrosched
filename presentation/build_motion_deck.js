@@ -1,5 +1,5 @@
-// Builds presentation/MetroSched_Motion.pptx: 12 slides in the website's black / white / olive theme,
-// with Morph transitions (a moving olive "sun" and accent bar) and staggered fade-up entrances.
+// Builds presentation/MetroSched_Motion.pptx: 11 slides in the website's black / white / olive theme,
+// with Morph transitions (a moving olive accent bar) and staggered fade-up entrances.
 // Run from the project root with pptxgenjs + jszip on NODE_PATH:  node presentation/build_motion_deck.js
 const path = require("path");
 const pptxgen = require("pptxgenjs");
@@ -23,9 +23,8 @@ const H = (s, t, kicker) => {
 };
 const box = (s, x, y, w, h, fill = CARD, o = {}) =>
   s.addShape(pres.shapes.ROUNDED_RECTANGLE, { objectName: nm(), x, y, w, h, fill: { color: fill }, line: { color: LINE, width: 1 }, rectRadius: 0.12, ...o });
-// Morph actors: the olive sun and the accent bar move between slides.
+// Morph actor: the olive accent bar moves between slides.
 const actors = (s, sun, bar) => {
-  s.addShape(pres.shapes.OVAL, { objectName: "!!sun", ...sun, fill: { color: DEEP, transparency: 35 }, line: { type: "none" } });
   s.addShape(pres.shapes.RECTANGLE, { objectName: "!!bar", ...bar, fill: { color: OLIVE }, line: { type: "none" } });
 };
 const slide = () => { const s = pres.addSlide(); s.background = { color: BG }; return s; };
@@ -184,18 +183,39 @@ const card = (s, x, y, w, h, head, body, accent = OLIVE) => {
 // 10. Agent memory (new)
 {
   const s = slide();
-  actors(s, { x: 9.8, y: -1.2, w: 5, h: 5 }, { x: 0.7, y: 1.75, w: 7.4, h: 0.06 });
-  H(s, "New: the planner remembers (agent memory)", "Agent");
-  T(s, "Like a shift supervisor who remembers last week, the planner looks back before it explains tonight.", { x: 0.7, y: 2.2, w: 11.8, h: 0.7, fontSize: 19 });
-  card(s, 0.7, 3.0, 5.8, 2.3, "What it remembers", "• Where each train was in the last 5 saved plans\n• Every supervisor change, with its reason and date");
-  card(s, 6.8, 3.0, 5.8, 2.3, "What it tells you", "Short notes under each train, plus a 'History' tag when something changed", REV);
-  box(s, 0.7, 5.55, 11.9, 1.2, "1B1F12", { line: { color: DEEP, width: 1 } });
-  T(s, [
-    { text: "TS-12 · ", options: { bold: true, color: OLIVE } },
-    { text: "\"Supervisors changed it 1 time(s); last to Maintenance (IBL) on 23 Nov: brake check.\"", options: { breakLine: true } },
-    { text: "TS-08 · ", options: { bold: true, color: OLIVE } },
-    { text: "\"Same place (In service) in each of the last 2 plans.\"", options: {} },
-  ], { x: 1.0, y: 5.72, w: 11.4, h: 0.95, fontSize: 15 });
+  actors(s, { x: 11.4, y: -1.4, w: 3.2, h: 3.2 }, { x: 0.7, y: 1.75, w: 7.4, h: 0.06 });
+  H(s, "How the agent remembers the past", "Agent memory");
+  // Step 1-4 pipeline
+  const steps = [
+    ["1  Save", "Every plan and every supervisor change is stored in the database"],
+    ["2  Look back", "For each train: its place in the last 5 plans + its change log"],
+    ["3  Spot patterns", "Moved since last plan? Same place again? Many maintenance visits?"],
+    ["4  Tell", "Short notes under the train, and a 'History' tag"],
+  ];
+  steps.forEach(([h, d], i) => {
+    const x = 0.7 + i * 3.05;
+    box(s, x, 2.1, 2.8, 1.75);
+    T(s, h, { x: x + 0.25, y: 2.25, w: 2.4, h: 0.45, fontFace: "Arial", fontSize: 18, bold: true, color: OLIVE });
+    T(s, d, { x: x + 0.25, y: 2.75, w: 2.4, h: 1.0, fontSize: 13, color: MUTED });
+    if (i < 3) s.addShape(pres.shapes.CHEVRON, { objectName: nm(), x: x + 2.85, y: 2.85, w: 0.18, h: 0.32, fill: { color: OLIVE }, line: { type: "none" } });
+  });
+  // Timeline: one train's past plans read by the agent
+  T(s, "Example: what it reads for one train (illustration)", { x: 0.7, y: 4.15, w: 8, h: 0.35, fontSize: 13, color: MUTED });
+  const past = [["Plan 1", "In service", REV], ["Plan 2", "In service", REV], ["Plan 3", "Maintenance", IBL], ["Plan 4", "Maintenance", IBL], ["Tonight", "Maintenance", IBL]];
+  past.forEach(([p, a, c], i) => {
+    const x = 0.7 + i * 1.62;
+    T(s, p, { x, y: 4.55, w: 1.5, h: 0.3, fontSize: 12, color: MUTED, align: "center" });
+    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { objectName: nm(), x: x + 0.05, y: 4.9, w: 1.4, h: 0.55, rectRadius: 0.27, fill: { color: c, transparency: i === 4 ? 0 : 35 }, line: { color: i === 4 ? WHITE : c, width: i === 4 ? 1.5 : 1 } });
+    T(s, a, { x: x + 0.05, y: 5.03, w: 1.4, h: 0.3, fontSize: 12, bold: true, align: "center", color: BG });
+  });
+  box(s, 0.7, 5.75, 8.0, 0.75, CARD);
+  T(s, [{ text: "Change log  ", options: { bold: true, color: OLIVE } }, { text: "Plan 3 · supervisor moved it to Maintenance · \"brake check\"" }], { x: 0.95, y: 5.95, w: 7.6, h: 0.4, fontSize: 14 });
+  // Resulting notes
+  s.addShape(pres.shapes.CHEVRON, { objectName: nm(), x: 8.95, y: 5.35, w: 0.25, h: 0.45, fill: { color: OLIVE }, line: { type: "none" } });
+  box(s, 9.4, 4.4, 3.2, 2.2, "1B1F12", { line: { color: DEEP, width: 1 } });
+  T(s, "Notes it writes", { x: 9.6, y: 4.5, w: 2.9, h: 0.35, fontFace: "Arial", fontSize: 14, bold: true, color: OLIVE });
+  T(s, "• Same place (Maintenance) in each of the last 2 plans\n• Sent to maintenance in 2 of the last 4 plans: may need a deeper check\n• Supervisors changed it 1 time; last: \"brake check\"", { x: 9.6, y: 4.85, w: 2.9, h: 1.7, fontSize: 11 });
+  T(s, "It only reads what was really saved: nothing is guessed.", { x: 0.7, y: 6.7, w: 11.8, h: 0.4, fontSize: 14, color: MUTED });
 }
 
 // 11. Fault notes + guardrails
@@ -212,20 +232,6 @@ const card = (s, x, y, w, h, head, body, accent = OLIVE) => {
     T(s, d, { x: x + 0.3, y: 3.65, w: 2.3, h: 1.1, fontSize: 14, color: MUTED });
   });
   T(s, "Tested on 13 labelled questions: the safety checks were right every time (1.0) and the right note was always in the top 4 (1.0). Every question is logged.", { x: 0.7, y: 5.25, w: 11.8, h: 1.0, fontSize: 17 });
-}
-
-// 12. Summary
-{
-  const s = slide();
-  actors(s, { x: 8.2, y: 2.2, w: 7, h: 7 }, { x: 0.7, y: 1.75, w: 1.6, h: 0.06 });
-  H(s, "What we built", "Summary");
-  const facts = [["< 1 s", "to plan all 25 trains"], ["46 + 6 + 1", "backend, frontend and browser tests passing"], ["Live", "metrosched.vercel.app"]];
-  facts.forEach(([k, d], i) => {
-    const y = 2.3 + i * 1.3;
-    T(s, k, { x: 0.7, y, w: 3.4, h: 0.9, fontFace: "Arial", fontSize: 38, bold: true, color: OLIVE });
-    T(s, d, { x: 4.2, y: y + 0.25, w: 5, h: 0.6, fontSize: 19 });
-  });
-  T(s, "Real data · a solver that keeps the rules · reasons in plain words · people stay in charge · it remembers.", { x: 0.7, y: 6.3, w: 9, h: 0.6, fontSize: 16, color: MUTED });
 }
 
 // ---------- motion: Morph transitions + staggered fade-up entrances ----------
@@ -258,7 +264,7 @@ function timing(ids) {
     xml = xml.replace("</p:clrMapOvr>", "</p:clrMapOvr>" + add);
     zip.file(f, xml);
   }
-  if (slides.length !== 12) throw new Error(`expected 12 slides, got ${slides.length}`);
+  if (slides.length !== 11) throw new Error(`expected 11 slides, got ${slides.length}`);
   await require("fs").promises.writeFile(OUT, await zip.generateAsync({ type: "nodebuffer" }));
   console.log(`wrote ${OUT} (${slides.length} slides)`);
 })();
