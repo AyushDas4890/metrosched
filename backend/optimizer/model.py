@@ -95,7 +95,7 @@ def candidate_score(snap: FleetSnapshot, train: dict, weights: dict, mean_km: fl
     return round(s, 1)
 
 
-def _build(snap: FleetSnapshot, weights: dict, relax: bool):
+def _build(snap: FleetSnapshot, weights: dict, relax: bool, pinned: dict[str, str] | None = None):
     m = cp_model.CpModel()
     ids = [t["train_id"] for t in snap.trains]
     x = {(t, a): m.new_bool_var(f"x_{t}_{a}") for t in ids for a in ASSIGNMENTS}
@@ -103,6 +103,9 @@ def _build(snap: FleetSnapshot, weights: dict, relax: bool):
         m.add_exactly_one(x[t, a] for a in ASSIGNMENTS)
         if not is_fit(snap, t):
             m.add(x[t, IBL] == 1)
+    # Supervisor decisions are fixed; the solver re-plans every other train around them.
+    for t, a in (pinned or {}).items():
+        m.add(x[t, a] == 1)
 
     slack = {}
     def slack_var(name, ub):
@@ -150,15 +153,16 @@ def _build(snap: FleetSnapshot, weights: dict, relax: bool):
     return m, x, slack, mean_km
 
 
-def solve(snap: FleetSnapshot, weights: dict | None = None) -> PlanResult:
+def solve(snap: FleetSnapshot, weights: dict | None = None, pinned: dict[str, str] | None = None) -> PlanResult:
+    """Optimal plan. `pinned` maps train_id -> assignment fixed by a supervisor."""
     weights = {**DEFAULT_WEIGHTS, **(weights or {})}
-    m, x, _, mean_km = _build(snap, weights, relax=False)
+    m, x, _, mean_km = _build(snap, weights, relax=False, pinned=pinned)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = TIME_LIMIT_S
     solver.parameters.num_workers = 1  # single worker: tied optima always resolve the same way
     status = solver.solve(m)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        return _relaxation_report(snap, weights)
+        return _relaxation_report(snap, weights, pinned)
 
     assignment = {t["train_id"]: next(a for a in ASSIGNMENTS if solver.value(x[t["train_id"], a]))
                   for t in snap.trains}
@@ -173,8 +177,8 @@ def solve(snap: FleetSnapshot, weights: dict | None = None) -> PlanResult:
                       rules_not_checked(snap), goals_not_used(snap))
 
 
-def _relaxation_report(snap: FleetSnapshot, weights: dict) -> PlanResult:
-    m, _, slack, _ = _build(snap, weights, relax=True)
+def _relaxation_report(snap: FleetSnapshot, weights: dict, pinned: dict[str, str] | None = None) -> PlanResult:
+    m, _, slack, _ = _build(snap, weights, relax=True, pinned=pinned)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = TIME_LIMIT_S
     solver.parameters.num_workers = 1  # single worker: tied optima always resolve the same way

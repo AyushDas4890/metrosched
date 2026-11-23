@@ -152,24 +152,47 @@ def create_app(db_url: str | None = None) -> FastAPI:
         if body.to_assignment != "IBL" and not is_fit(snap, body.train_id):
             raise HTTPException(422, f"{body.train_id} is unfit (hard constraint); it can only be assigned IBL")
         plan_id = body.plan_id or db.scalar(select(M.Plan.id).order_by(desc(M.Plan.id)).limit(1))
-        current = db.scalar(select(M.PlanItemRow).where(M.PlanItemRow.plan_id == plan_id,
-                                                        M.PlanItemRow.train_id == body.train_id)) if plan_id else None
+        plan = db.get(M.Plan, plan_id) if plan_id else None
+        rows = list(db.scalars(select(M.PlanItemRow).where(M.PlanItemRow.plan_id == plan_id))) if plan else []
+        before = {r.train_id: r.assignment for r in rows}
         row = M.Override(plan_id=plan_id, train_id=body.train_id,
-                         from_assignment=current.assignment if current else "UNKNOWN",
+                         from_assignment=before.get(body.train_id, "UNKNOWN"),
                          to_assignment=body.to_assignment, reason=body.reason, supervisor=body.supervisor,
                          features=features(snap, train))
+        moved = []
+        if rows:
+            # Every supervisor change on this plan is pinned; the solver re-plans the rest of the fleet.
+            pins = {o.train_id: o.to_assignment for o in db.scalars(
+                select(M.Override).where(M.Override.plan_id == plan_id).order_by(M.Override.id))}
+            pins[body.train_id] = body.to_assignment
+            res = solve(snap, plan.weights, pinned=pins)
+            if not res.feasible:
+                msg = "; ".join(r["message"] for r in res.relaxations if r["constraint"] != "info")
+                raise HTTPException(422, f"No valid plan with {body.train_id} in {body.to_assignment}: {msg}")
+            notes = {o.train_id: f"Supervisor override: {o.from_assignment} to {o.to_assignment} ({o.reason})"
+                     for o in db.scalars(select(M.Override).where(M.Override.plan_id == plan_id))}
+            notes[body.train_id] = f"Supervisor override: {row.from_assignment} to {body.to_assignment} ({body.reason})"
+            for r in rows:
+                db.delete(r)
+            db.flush()
+            for i in res.items:
+                d = dict(i.__dict__)
+                if i.train_id in notes:
+                    d["violations"] = d["violations"] + [notes[i.train_id]]
+                elif before.get(i.train_id) != i.assignment:
+                    moved.append({"train_id": i.train_id, "from": before.get(i.train_id), "to": i.assignment})
+                    d["reasons"] = [f"Moved by the planner after the change to {body.train_id}"] + d["reasons"]
+                db.add(M.PlanItemRow(plan_id=plan_id, **d))
+            plan.objective = res.objective
         db.add(row)
-        if current:
-            current.assignment = body.to_assignment
-            current.violations = current.violations + [
-                f"Supervisor override: {row.from_assignment} to {body.to_assignment} ({body.reason})"]
         db.commit()
-        return OverrideOut(**{c: getattr(row, c) for c in OverrideOut.model_fields})
+        out = {c: getattr(row, c) for c in OverrideOut.model_fields if c != "moved"}
+        return OverrideOut(**out, moved=moved)
 
     @app.get("/plan/overrides", response_model=list[OverrideOut])
     def list_overrides(db: Session = Depends(get_db)):
         rows = db.scalars(select(M.Override).order_by(desc(M.Override.id)))
-        return [OverrideOut(**{c: getattr(r, c) for c in OverrideOut.model_fields}) for r in rows]
+        return [OverrideOut(**{c: getattr(r, c) for c in OverrideOut.model_fields if c != "moved"}) for r in rows]
 
     @app.get("/plan/history")
     def history(limit: int = 20, db: Session = Depends(get_db)):

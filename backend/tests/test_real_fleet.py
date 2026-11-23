@@ -51,3 +51,26 @@ def test_low_pressure_minutes_raise_an_alert():
     snap = real_snapshot()
     item = next(i for i in solve(snap).items if i.train_id == "TS-05")
     assert any("below 7 bar" in v for v in item.violations)
+
+
+def test_override_resolves_plan_around_the_change(tmp_path):
+    """Moving a service train to IBL pulls a standby train into service, keeping 18 in service."""
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    real_client = TestClient(create_app(f"sqlite:///{tmp_path / 'o.db'}"))
+    plan = real_client.post("/plan/generate", json={}).json()
+    before = {i["train_id"]: i["assignment"] for i in plan["items"]}
+    assert before["TS-12"] == "REVENUE"
+    r = real_client.post("/plan/override", json={"train_id": "TS-12", "to_assignment": "IBL", "reason": "brake check"})
+    assert r.status_code == 200
+    moved = r.json()["moved"]
+    assert any(m["from"] == "STANDBY" and m["to"] == "REVENUE" for m in moved)
+    after = real_client.get(f"/plan/{plan['plan_id']}").json()["items"]
+    assign = {i["train_id"]: i["assignment"] for i in after}
+    assert assign["TS-12"] == "IBL"
+    assert sum(a == "REVENUE" for a in assign.values()) == 18
+    # The first change stays pinned when a second one is made.
+    real_client.post("/plan/override", json={"train_id": "TS-08", "to_assignment": "STANDBY", "reason": "spare needed"})
+    assign = {i["train_id"]: i["assignment"] for i in real_client.get(f"/plan/{plan['plan_id']}").json()["items"]}
+    assert assign["TS-12"] == "IBL" and assign["TS-08"] == "STANDBY"
+    assert sum(a == "REVENUE" for a in assign.values()) == 18

@@ -81,6 +81,7 @@ class OverrideIn(BaseModel):
 
 class OverrideOut(BaseModel):
     id: int
+    moved: list[dict] = []  # other trains the re-solved plan moved: {train_id, from, to}
     created_at: datetime
     plan_id: int | None
     train_id: str

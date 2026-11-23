@@ -227,8 +227,12 @@ function OverrideForm({ item, planId, onDone }: { item: PlanItem; planId: number
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api.override({ train_id: item.train_id, to_assignment: to, reason, plan_id: planId });
-      setMsg(`Saved: ${item.train_id} moved to ${ASSIGNMENT_LABEL[to]}`);
+      const r = await api.override({ train_id: item.train_id, to_assignment: to, reason, plan_id: planId });
+      const others = (r.moved ?? []).map((m) => `${m.train_id} ${m.from ? ASSIGNMENT_LABEL[m.from] : "?"} → ${ASSIGNMENT_LABEL[m.to]}`);
+      setMsg(
+        `Saved: ${item.train_id} moved to ${ASSIGNMENT_LABEL[to]}.` +
+          (others.length ? ` The planner re-balanced the fleet: ${others.join("; ")}.` : " No other train needed to move."),
+      );
       onDone();
     } catch (err) {
       setMsg((err as Error).message);

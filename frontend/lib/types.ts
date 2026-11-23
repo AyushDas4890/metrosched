@@ -166,6 +166,7 @@ export interface Override {
   to_assignment: string;
   reason: string;
   supervisor: string;
+  moved?: { train_id: string; from: Assignment | null; to: Assignment }[];
 }
 
 export type Scenario =

@@ -3,23 +3,23 @@
 /* MetroSched brand: night-shift operator desk.
    Assignment colours validated for CVD against the card surface #13232D (dataviz validator, dark mode). */
 :root {
-  --background: #0e1a21;
-  --foreground: #e6edf0;
-  --card: #13232d;
-  --card-foreground: #e6edf0;
-  --popover: #172a35;
-  --popover-foreground: #e6edf0;
-  --primary: #2a9fc6;
-  --primary-foreground: #06131a;
-  --secondary: #1d3340;
-  --secondary-foreground: #e6edf0;
-  --muted: #182c37;
-  --muted-foreground: #93a6af;
-  --accent: #1d3340;
-  --accent-foreground: #e6edf0;
+  --background: #07090b;
+  --foreground: #f2f2f0;
+  --card: #141414;
+  --card-foreground: #f2f2f0;
+  --popover: #1a1a1a;
+  --popover-foreground: #f2f2f0;
+  --primary: #ff6a1a;
+  --primary-foreground: #0a0a0a;
+  --secondary: #222222;
+  --secondary-foreground: #f2f2f0;
+  --muted: #1c1c1c;
+  --muted-foreground: #a3a3a3;
+  --accent: #222222;
+  --accent-foreground: #f2f2f0;
   --destructive: #da5670;
-  --border: #243945;
-  --input: #2d4553;
+  --border: #2c2c2c;
+  --input: #383838;
   --ring: #6cc6e6;
   --radius: 0.75rem;
 
@@ -30,12 +30,12 @@
   --revenue-ink: #7fd0ee;
   --standby-ink: #e8b968;
   --ibl-ink: #f39aab;
-  --grid: #213541;
-  --axis: #93a6af;
+  --grid: #262626;
+  --axis: #a3a3a3;
 
   /* Train plate: a light stencilled plate on the dark desk, the one bold brand element. */
   --plate: #e6edf0;
-  --plate-ink: #0e1a21;
+  --plate-ink: #0a0a0a;
 }
 
 @theme inline {
@@ -85,11 +85,7 @@ html {
    Kept dark so cards and text keep their contrast; fixed so it does not scroll. */
 body {
   background-color: var(--background);
-  background-image:
-    radial-gradient(60rem 40rem at 0% 0%, rgb(20 110 120 / 0.45), transparent 70%),
-    radial-gradient(55rem 40rem at 100% 15%, rgb(48 66 170 / 0.40), transparent 70%),
-    radial-gradient(70rem 45rem at 50% 110%, rgb(120 40 110 / 0.40), transparent 70%);
-  background-attachment: fixed;
+  isolation: isolate;
   color: var(--foreground);
   line-height: 1.5;
 }
@@ -139,4 +135,52 @@ textarea {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/* Background after Instrument: black field, warm off-white band, a big orange sun rising, film grain. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(circle 34vmax at 92% 92%, rgb(255 98 26 / 0.95) 0 60%, rgb(232 140 40 / 0.55) 72%, transparent 74%),
+    linear-gradient(180deg, transparent 0 58%, rgb(245 238 226 / 0.06) 58% 64%, transparent 64%),
+    radial-gradient(60vmax 40vmax at 10% -10%, rgb(255 255 255 / 0.10), transparent 70%);
+  animation: sun-rise 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+body::after {
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes sun-rise {
+  from { transform: translate3d(0, 35vh, 0); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+}
+
+/* Apple-style materials: cards are frosted glass over the backdrop, with a light-catching top edge. */
+.bg-card {
+  background: color-mix(in srgb, var(--card) 68%, transparent) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+}
+/* Feedback on press, instantly. */
+button:not(:disabled):active,
+a:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .bg-card, .material { background: var(--card) !important; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .bg-card { background: var(--card) !important; backdrop-filter: none; border-color: #6b6b6b; }
 }
