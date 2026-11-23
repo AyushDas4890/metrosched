@@ -1,7 +1,11 @@
 """Grounded answers over the knowledge base (Unit IV RAG + Unit VI guardrails).
 
-Pipeline: input guardrail -> TF-IDF retrieval -> Claude answers from the retrieved passages only, with
-API citations -> output guardrail (every claim must cite a passage) -> audit log.
+Pipeline: input guardrail -> TF-IDF retrieval -> an LLM answers from the retrieved passages only, with
+citations -> output guardrail (every answer must cite a passage) -> audit log.
+
+Provider: OpenAI when OPENAI_API_KEY is set (model from OPENAI_MODEL, default gpt-4.1-mini), otherwise
+Claude when ANTHROPIC_API_KEY is set. Claude uses the API's built-in citations; OpenAI returns JSON naming the
+passages and quoting them, and every quote is checked to appear word for word in its passage.
 
 Without an API key (or if any check fails) the endpoint still works: it returns the retrieved quotes and
 says why no written answer was produced. Nothing is ever answered from outside the real corpus.
@@ -18,6 +22,7 @@ from pathlib import Path
 from rag import kb
 
 MODEL = "claude-opus-5-5"
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 AUDIT_LOG = Path(__file__).resolve().parents[1] / "kb_answer_audit.jsonl"
 MAX_QUESTION = 300
 
@@ -59,6 +64,9 @@ def _audit(entry: dict) -> None:
 
 
 def _client():
+    if os.environ.get("OPENAI_API_KEY"):
+        import openai
+        return openai.OpenAI()
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         return None
     import anthropic
@@ -83,7 +91,9 @@ def answer(question: str, k: int = 4, client=None, index: kb.Index | None = None
         if not hits:
             result.update(status="no_match", reason="No fault note matches this question.")
         elif client is None:
-            result.update(status="quotes_only", reason="No Claude API key is set, so only the matching quotes are shown.")
+            result.update(status="quotes_only", reason="No OpenAI or Claude API key is set, so only the matching quotes are shown.")
+        elif hasattr(client, "chat"):
+            _ask_openai(client, question, [chunks[h["id"]] for h in hits], result)
         else:
             _ask(client, question, [chunks[h["id"]] for h in hits], result)
 
@@ -129,5 +139,56 @@ def _ask(client, question: str, docs: list[dict], result: dict) -> None:
         result.update(status="no_match", answer=answer_text, reason="The fault notes do not cover this.")
     elif not cites:
         result.update(status="quotes_only", reason="The answer had no citation to a fault note, so it was withheld.")
+    else:
+        result.update(status="answered", answer=answer_text, citations=cites)
+
+
+OPENAI_RULES = (
+    " The documents are numbered [1], [2] and so on. Reply with JSON only: "
+    '{"answer": "<your sentences>", "citations": [{"doc": <number>, "quote": "<exact words copied from that document>"}]}. '
+    "Every quote must be copied word for word from the document it names. If the documents do not answer the "
+    'question, reply {"answer": "The fault notes do not cover this.", "citations": []}.'
+)
+
+
+def _ask_openai(client, question: str, docs: list[dict], result: dict) -> None:
+    numbered = "\n\n".join(f"[{i + 1}] {d['title']} ({d['doc']}, {d['id']})\n{d['text']}" for i, d in enumerate(docs))
+    try:
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL, max_tokens=600, temperature=0,
+            response_format={"type": "json_object"},
+            messages=[{"role": "system", "content": SYSTEM + OPENAI_RULES},
+                      {"role": "user", "content": f"Documents:\n\n{numbered}\n\nQuestion: {question}"}],
+        )
+        msg = resp.choices[0].message
+    except Exception as e:  # network, auth or rate limit: degrade to quotes, never fail the page
+        result.update(status="quotes_only", reason=f"The answer service is unavailable ({type(e).__name__}); showing quotes.")
+        return
+    if getattr(msg, "refusal", None):
+        result.update(status="quotes_only", reason="The model declined to answer; showing quotes.")
+        return
+    try:
+        data = json.loads(msg.content or "")
+        answer_text = str(data.get("answer", "")).strip()
+        raw = data.get("citations") or []
+    except (ValueError, AttributeError):
+        result.update(status="quotes_only", reason="The answer was not in the expected format, so it was withheld.")
+        return
+
+    # Output guardrail: keep only citations whose quote really appears in the named retrieved passage.
+    norm = lambda t: " ".join(str(t).split()).lower()
+    cites = []
+    for c in raw if isinstance(raw, list) else []:
+        try:
+            i = int(c.get("doc")) - 1
+        except (TypeError, ValueError, AttributeError):
+            continue
+        quote = str(c.get("quote", "")).strip()
+        if 0 <= i < len(docs) and quote and norm(quote) in norm(docs[i]["text"]):
+            cites.append({"passage_id": docs[i]["id"], "title": docs[i]["title"], "quote": quote})
+    if "do not cover this" in answer_text:
+        result.update(status="no_match", answer=answer_text, reason="The fault notes do not cover this.")
+    elif not cites:
+        result.update(status="quotes_only", reason="The answer had no checked citation to a fault note, so it was withheld.")
     else:
         result.update(status="answered", answer=answer_text, citations=cites)
