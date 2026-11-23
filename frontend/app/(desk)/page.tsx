@@ -22,6 +22,12 @@ export default function TonightsPlan() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [memory, setMemory] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (!plan?.plan_id) return;
+    api.memory(plan.plan_id).then((m) => setMemory(m.notes)).catch(() => setMemory({}));
+  }, [plan]);
 
   const loadLatest = useCallback(async () => {
     try {
@@ -118,6 +124,7 @@ export default function TonightsPlan() {
                 expanded={open === item.train_id}
                 onToggle={() => setOpen(open === item.train_id ? null : item.train_id)}
                 planId={plan.plan_id}
+                memory={memory[item.train_id] ?? []}
                 onOverridden={loadLatest}
               />
             ))}
@@ -145,12 +152,14 @@ function PlanRow({
   onToggle,
   planId,
   onOverridden,
+  memory,
 }: {
   item: PlanItem;
   expanded: boolean;
   onToggle: () => void;
   planId: number | null;
   onOverridden: () => void;
+  memory: string[];
 }) {
   return (
     <motion.li id={`row-${item.train_id}`} layout="position" transition={LAYOUT_SPRING} data-testid="plan-row" className="border-b last:border-b-0">
@@ -168,6 +177,11 @@ function PlanRow({
         <span className="hidden text-right tabular-nums text-muted-foreground md:block">{item.score.toFixed(1)}</span>
         <span className="col-span-3 flex min-w-0 items-center gap-2 text-sm md:col-span-1">
           <span className="truncate">{keyReason(item)}</span>
+          {memory.some((m) => !m.startsWith("Same place")) && (
+            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground" title={memory.join(" ")}>
+              History
+            </span>
+          )}
           {item.violations.length > 0 && (
             <span className="shrink-0 rounded-full bg-standby/15 px-2 py-0.5 text-xs font-semibold text-standby-ink">
               ⚠ {item.violations.length} to check
@@ -195,6 +209,16 @@ function PlanRow({
                     <li key={i}>{r}</li>
                   ))}
                 </ul>
+                {memory.length > 0 && (
+                  <>
+                    <h3 className="mb-1 font-semibold">From the planner&apos;s memory</h3>
+                    <ul className="mb-3 list-disc space-y-0.5 pl-5 text-sm text-muted-foreground" data-testid="memory-notes">
+                      {memory.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
                 {item.violations.length > 0 && (
                   <>
                     <h3 className="mb-1 font-semibold">Things to check</h3>

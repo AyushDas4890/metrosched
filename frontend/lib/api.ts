@@ -22,6 +22,7 @@ export const api = {
   generate: () => call<Plan>("/plan/generate", { method: "POST", body: "{}" }),
   history: () => call<{ plan_id: number; created_at: string; feasible: boolean; counts: Record<string, number> }[]>("/plan/history"),
   plan: (id: number) => call<Plan>(`/plan/${id}`),
+  memory: (id: number) => call<{ plan_id: number; notes: Record<string, string[]> }>(`/plan/${id}/memory`),
   fleet: () => call<FleetStatus>("/fleet/status"),
   simulate: (scenarios: Scenario[]) =>
     call<SimulateResult>("/plan/simulate", { method: "POST", body: JSON.stringify({ scenarios }) }),

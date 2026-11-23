@@ -25,6 +25,7 @@ from optimizer.model import PlanResult, solve  # noqa: E402
 from optimizer.simulate import simulate  # noqa: E402
 from optimizer.snapshot import FleetSnapshot  # noqa: E402
 
+from . import memory  # noqa: E402
 from . import metropt_fleet  # noqa: E402
 from . import models as M  # noqa: E402
 from . import repo  # noqa: E402
@@ -272,6 +273,12 @@ def create_app(db_url: str | None = None) -> FastAPI:
             raise HTTPException(404, "MetroPT-3 data not prepared. Run data/metropt3/prepare.py.")
         return {"source": apu_risk.SOURCE, "alert_threshold": apu_risk.ALERT_AT,
                 "slice_hours": apu_risk.SLICE_WINDOWS / 2, "metrics": apu_risk.evaluate(scores)}
+
+    @app.get("/plan/{plan_id}/memory")
+    def plan_memory(plan_id: int, db: Session = Depends(get_db)):
+        if not db.get(M.Plan, plan_id):
+            raise HTTPException(404, "plan not found")
+        return {"plan_id": plan_id, "notes": memory.recall(db, plan_id)}
 
     @app.get("/ml/weights")
     def ml_weights(db: Session = Depends(get_db)):
