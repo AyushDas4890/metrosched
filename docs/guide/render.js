@@ -15,7 +15,7 @@ const { chromium } = require(path.join(__dirname, "../../frontend/node_modules/p
     headerTemplate: "<span></span>",
     footerTemplate:
       '<div style="font-size:8px;color:#4f626b;width:100%;padding:0 16mm;display:flex;justify-content:space-between">' +
-      '<span>MetroSched, explained · synthetic data</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>',
+      '<span>MetroSched, explained · real MetroPT-3 data</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>',
     margin: { top: "18mm", bottom: "20mm", left: "16mm", right: "16mm" },
   });
   await browser.close();

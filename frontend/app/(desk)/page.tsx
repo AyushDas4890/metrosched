@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import CountUp from "@/components/CountUp";
-import SpotlightCard from "@/components/SpotlightCard";
+import { Depot3D } from "@/components/depot-3d";
 import { AssignmentBadge } from "@/components/assignment-badge";
 import { ErrorNote, PageHeader } from "@/components/page-header";
 import { TrainPlate } from "@/components/train-plate";
@@ -17,8 +16,6 @@ import { LAYOUT_SPRING } from "@/lib/motion";
 import type { Assignment, Plan, PlanItem } from "@/lib/types";
 
 const ORDER: Assignment[] = ["REVENUE", "STANDBY", "IBL"];
-const GLOW: Record<Assignment, string> = { REVENUE: "#2a9fc6", STANDBY: "#bc8422", IBL: "#da5670" };
-const COUNT_INK: Record<Assignment, string> = { REVENUE: "text-revenue-ink", STANDBY: "text-standby-ink", IBL: "text-ibl-ink" };
 
 export default function TonightsPlan() {
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -59,11 +56,11 @@ export default function TonightsPlan() {
         <div className="flex flex-wrap items-center gap-3">
           {plan?.feasible && (
             <span className="text-sm text-muted-foreground">
-              Service {plan.service_date} · solved in {plan.solve_seconds.toFixed(2)} s
+              For service on {plan.service_date}
             </span>
           )}
           <Button onClick={generate} disabled={busy} className="pressable h-10 rounded-full px-5 font-semibold">
-            {busy ? "Generating…" : "Generate plan"}
+            {busy ? "Working…" : "Generate plan"}
           </Button>
         </div>
       </PageHeader>
@@ -74,16 +71,16 @@ export default function TonightsPlan() {
 
       {!plan && !error && (
         <p className="max-w-prose text-muted-foreground">
-          No plan yet for tonight. Generate a plan to rank every trainset for revenue service, standby or the inspection bay line.
+          No plan yet for tonight. Press Generate plan and every trainset is placed in service, on standby or kept back for maintenance, with the reason written out.
         </p>
       )}
 
       {plan && !plan.feasible && (
         <section aria-labelledby="relax" className="rounded-xl border border-ibl/50 bg-card p-5">
           <h2 id="relax" className="font-condensed text-2xl font-bold">
-            No plan satisfies every hard rule
+            No plan can meet every safety rule tonight
           </h2>
-          <p className="mb-2 text-sm text-muted-foreground">The smallest relaxation that would make a plan possible:</p>
+          <p className="mb-2 text-sm text-muted-foreground">The smallest change that would make a plan possible:</p>
           <ul className="list-disc pl-5">
             {plan.relaxations.map((r, i) => (
               <li key={i}>{r.message}</li>
@@ -94,53 +91,25 @@ export default function TonightsPlan() {
 
       {plan?.feasible && counts && (
         <>
-          <section aria-label="Assignment summary" className="mb-8 grid gap-4 md:grid-cols-3">
-            {ORDER.map((a) => (
-              <SpotlightCard
-                key={a}
-                spotlightColor={GLOW[a]}
-                intensity={0.18}
-                className="!rounded-xl !p-5"
-                style={{ "--spotlight-card-surface": "var(--card)", "--spotlight-card-border": "var(--border)" } as React.CSSProperties}
-              >
-                <div className="flex items-start justify-between">
-                  <AssignmentBadge value={a} />
-                  <span aria-hidden="true">
-                    <CountUp
-                      to={counts[a]}
-                      duration={0.9}
-                      trigger="load"
-                      className={`display font-condensed text-6xl font-bold tabular-nums ${COUNT_INK[a]}`}
-                    />
-                  </span>
-                  <span className="sr-only">
-                    {counts[a]} trains
-                  </span>
-                </div>
-                <motion.div layout className="mt-4 flex flex-wrap gap-1.5">
-                  {plan.items
-                    .filter((i) => i.assignment === a)
-                    .map((i) => (
-                      <motion.span key={i.train_id} layoutId={`chip-${i.train_id}`} transition={LAYOUT_SPRING}>
-                        <TrainPlate id={i.train_id} className="text-sm" />
-                      </motion.span>
-                    ))}
-                </motion.div>
-              </SpotlightCard>
-            ))}
-          </section>
+          <Guide />
+          <Depot3D
+            items={plan.items}
+            onPick={(id) => {
+              setOpen(id);
+              document.getElementById(`row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          />
 
           <p className="mb-2 text-sm text-muted-foreground">
-            Ranked revenue first, then standby, then IBL. Within each group, a higher score means a better fit for revenue service.
-            Select a train to see every reason or override it.
+            Full list, best fit for service at the top. Open a train to read every reason, or to change its placement.
           </p>
           <ol aria-label="Ranked induction list" className="overflow-hidden rounded-xl border bg-card">
             <li className="hidden grid-cols-[3rem_6rem_12rem_4.5rem_1fr] gap-3 border-b px-4 py-2.5 text-sm font-semibold text-muted-foreground md:grid">
               <span>Rank</span>
               <span>Train</span>
-              <span>Assignment</span>
-              <span className="text-right" title="Suitability for revenue service: higher for branding need and below-average mileage, lower for distance from the exit and open job cards">Score</span>
-              <span>Why</span>
+              <span>Tomorrow</span>
+              <span className="text-right" title="How well the train suits passenger service tonight. Higher is better.">Fit</span>
+              <span>Main reason</span>
             </li>
             {plan.items.map((item) => (
               <PlanRow
@@ -184,7 +153,7 @@ function PlanRow({
   onOverridden: () => void;
 }) {
   return (
-    <motion.li layout="position" transition={LAYOUT_SPRING} data-testid="plan-row" className="border-b last:border-b-0">
+    <motion.li id={`row-${item.train_id}`} layout="position" transition={LAYOUT_SPRING} data-testid="plan-row" className="border-b last:border-b-0">
       <button
         type="button"
         onClick={onToggle}
@@ -201,7 +170,7 @@ function PlanRow({
           <span className="truncate">{keyReason(item)}</span>
           {item.violations.length > 0 && (
             <span className="shrink-0 rounded-full bg-standby/15 px-2 py-0.5 text-xs font-semibold text-standby-ink">
-              ⚠ {item.violations.length} alert{item.violations.length > 1 ? "s" : ""}
+              ⚠ {item.violations.length} to check
             </span>
           )}
           <motion.span aria-hidden="true" animate={{ rotate: expanded ? 90 : 0 }} className="ml-auto shrink-0 text-muted-foreground">
@@ -228,7 +197,7 @@ function PlanRow({
                 </ul>
                 {item.violations.length > 0 && (
                   <>
-                    <h3 className="mb-1 font-semibold">Conflict alerts</h3>
+                    <h3 className="mb-1 font-semibold">Things to check</h3>
                     <ul className="list-disc space-y-0.5 pl-5 text-sm text-standby-ink">
                       {item.violations.map((v, i) => (
                         <li key={i}>{v}</li>
@@ -239,7 +208,7 @@ function PlanRow({
               </div>
               <OverrideForm item={item} planId={planId} onDone={onOverridden} />
               <div className="md:col-span-2">
-                <h3 className="mb-2 font-semibold">From the knowledge base</h3>
+                <h3 className="mb-2 font-semibold">Related notes from past failures</h3>
                 <KbRelated trainId={item.train_id} />
               </div>
             </div>
@@ -259,7 +228,7 @@ function OverrideForm({ item, planId, onDone }: { item: PlanItem; planId: number
     e.preventDefault();
     try {
       await api.override({ train_id: item.train_id, to_assignment: to, reason, plan_id: planId });
-      setMsg(`Override saved: ${item.train_id} to ${ASSIGNMENT_LABEL[to]}`);
+      setMsg(`Saved: ${item.train_id} moved to ${ASSIGNMENT_LABEL[to]}`);
       onDone();
     } catch (err) {
       setMsg((err as Error).message);
@@ -268,7 +237,7 @@ function OverrideForm({ item, planId, onDone }: { item: PlanItem; planId: number
 
   return (
     <form onSubmit={submit} className="space-y-2 rounded-lg border bg-card p-3">
-      <h3 className="font-semibold">Override this assignment</h3>
+      <h3 className="font-semibold">Change this placement</h3>
       <label className="block text-sm">
         Move to
         <select
@@ -284,11 +253,11 @@ function OverrideForm({ item, planId, onDone }: { item: PlanItem; planId: number
         </select>
       </label>
       <label className="block text-sm">
-        Reason
+        Why (saved in the log)
         <Input value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} className="mt-1" />
       </label>
       <Button type="submit" size="sm" variant="secondary" className="pressable">
-        Save override
+        Save change
       </Button>
       {msg && (
         <p role="status" className="text-sm">
@@ -296,5 +265,27 @@ function OverrideForm({ item, planId, onDone }: { item: PlanItem; planId: number
         </p>
       )}
     </form>
+  );
+}
+
+/** Three-step reading guide for depot staff. */
+function Guide() {
+  const steps = [
+    ["1", "Look at the tracks", "Each box is one trainset, sorted onto tomorrow's three tracks"],
+    ["2", "Check the yellow dots", "A dot means a warning the planner wants a person to look at"],
+    ["3", "Agree or change", "Open a train to read why. If you know better, move it and say why"],
+  ];
+  return (
+    <ol className="mb-4 grid gap-3 md:grid-cols-3" aria-label="How to read this page">
+      {steps.map(([n, t, d]) => (
+        <li key={n} className="flex gap-3 rounded-lg border bg-card px-4 py-3">
+          <span className="font-condensed text-2xl font-bold tabular-nums text-muted-foreground">{n}</span>
+          <span>
+            <span className="block font-semibold">{t}</span>
+            <span className="text-sm text-muted-foreground">{d}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

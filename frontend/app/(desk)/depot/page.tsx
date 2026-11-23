@@ -87,7 +87,7 @@ export default function DepotMap() {
       <div className="grid gap-4 md:grid-cols-2">
         <section aria-labelledby="ibl" className="rounded-xl border bg-card p-5">
           <h2 id="ibl" className="mb-2 font-condensed text-2xl font-bold">
-            Inspection bay line ({ibl.length} of {fleet.config.ibl_capacity} bays)
+            Kept back on the maintenance line ({ibl.length} of {fleet.config.ibl_capacity} bays used)
           </h2>
           <ul className="space-y-1 text-sm">
             {ibl.map((i) => (

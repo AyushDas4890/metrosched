@@ -10,7 +10,7 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
 export function ErrorNote({ message }: { message: string }) {
   return (
     <p role="alert" className="rounded-lg border border-ibl/50 bg-ibl/10 px-3 py-2 text-sm text-ibl-ink">
-      {message}. Check that the backend is running on port 8000, then load the seed data.
+      {message}. The planning server is not answering. Ask IT to start it (port 8000), then reload this page.
     </p>
   );
 }

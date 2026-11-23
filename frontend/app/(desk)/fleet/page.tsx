@@ -31,7 +31,7 @@ export default function FleetHealth() {
 
   return (
     <div>
-      <PageHeader title="Fleet health" />
+      <PageHeader title="Train health" />
       <ApuRiskSection trains={fleet.trains} />
 
       {fleet.inputs_loaded.certificates ? (
@@ -97,7 +97,7 @@ export default function FleetHealth() {
       </section>
       ) : (
         <div className="mb-8">
-          <NotLoaded what="fitness certificate" effect="The certificate hard rule is not checked, so no train is held out for an expired certificate." />
+          <NotLoaded what="fitness certificate" effect="Certificates are not checked, so confirm them by hand before turn-out." />
         </div>
       )}
 
@@ -136,7 +136,7 @@ export default function FleetHealth() {
         </div>
       </section>
       ) : (
-        <NotLoaded what="Maximo job card" effect="The critical-job-card hard rule is not checked." />
+        <NotLoaded what="job card" effect="Open faults are not checked, so confirm them with the maintenance desk." />
       )}
     </div>
   );

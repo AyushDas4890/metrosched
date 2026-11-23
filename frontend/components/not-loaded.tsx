@@ -4,8 +4,7 @@ export function NotLoaded({ what, effect }: { what: string; effect: string }) {
     <div role="note" className="rounded-lg border border-dashed px-4 py-3 text-sm">
       <p className="font-semibold">No {what} data loaded</p>
       <p className="mt-1 text-muted-foreground">
-        There is no public source for KMRL&apos;s {what}, and MetroSched does not invent it. {effect} Upload real files through{" "}
-        <code>POST /data/ingest</code> to enable it.
+        KMRL has not shared its {what} records, and MetroSched never makes them up. {effect} Once the records file is uploaded, this switches on by itself.
       </p>
     </div>
   );
@@ -17,8 +16,7 @@ export function CoverageNote({ rules, goals }: { rules: string[]; goals: string[
   return (
     <details className="mb-4 rounded-lg border border-standby/40 bg-standby/10 px-3 py-2 text-sm">
       <summary className="cursor-pointer text-standby-ink">
-        {rules.length} hard rule{rules.length === 1 ? "" : "s"} not checked and {goals.length} goal{goals.length === 1 ? "" : "s"} not used:
-        no real data loaded for them
+        Check by hand tonight: {rules.length} safety check{rules.length === 1 ? "" : "s"} and {goals.length} preference{goals.length === 1 ? "" : "s"} have no records yet (tap to see)
       </summary>
       <div className="mt-2 grid gap-3 md:grid-cols-2">
         <ul className="list-disc pl-5">

@@ -81,8 +81,15 @@ html {
   color-scheme: dark;
 }
 
+/* Three-colour night sky behind the desk: Kochi backwater teal, metro-line blue, dusk plum.
+   Kept dark so cards and text keep their contrast; fixed so it does not scroll. */
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(60rem 40rem at 0% 0%, rgb(20 110 120 / 0.45), transparent 70%),
+    radial-gradient(55rem 40rem at 100% 15%, rgb(48 66 170 / 0.40), transparent 70%),
+    radial-gradient(70rem 45rem at 50% 110%, rgb(120 40 110 / 0.40), transparent 70%);
+  background-attachment: fixed;
   color: var(--foreground);
   line-height: 1.5;
 }

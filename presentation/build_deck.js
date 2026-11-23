@@ -104,7 +104,7 @@ pres.addSection({ title: "How it works" });
   box("CP-SAT optimizer", "hard rules + weighted goals", 6.1, 1.8);
   box("Risk model", "scikit-learn random forest", 6.1, 3.6);
   box("Explanations", "rule-based reasons, alerts", 8.85, 2.7);
-  box("Knowledge base", "TF-IDF retrieval", 6.1, 5.4);
+  box("Fault notes", "TF-IDF + cited LLM answer", 6.1, 5.4);
   box("Next.js dashboard", "7 pages + 3D story", 8.85, 4.7, 2.15, INK, WHITE);
   const arrow = (x, y, w, h, rot = 0) => s.addShape(pres.shapes.RIGHT_ARROW, { x, y, w, h, rotate: rot, fill: { color: REV } });
   arrow(2.8, 2.55, 0.5, 0.35); arrow(2.8, 3.95, 0.5, 0.35, -30);
@@ -195,27 +195,29 @@ pres.addSection({ title: "Real data and retrieval" });
 
 // ================= 8. Knowledge base =================
 {
-  const s = content("Knowledge base: retrieval-augmented, without generation", "Real data and retrieval");
+  const s = content("Fault notes: grounded answers with guardrails and evaluation", "Real data and retrieval");
+  const steps = [
+    ["1  Input guardrail", "Refuse injection, requests to invent records, empty or over-long questions; never sent to the model"],
+    ["2  Retrieve", "TF-IDF (words + word pairs) over 10 real MetroPT-3 passages; cosine top 4, score ≥ 0.05"],
+    ["3  Generate", "Claude writes 2–4 plain sentences from those passages only, with API citations"],
+    ["4  Output guardrail", "No citation → answer withheld; refusal, error or no key → show quotes"],
+    ["5  Audit", "Every question, status and cited passage logged"],
+  ];
+  steps.forEach(([h, d], i) => {
+    const y = 1.45 + i * 1.0;
+    card(s, 0.6, y, 6.6, 0.88);
+    text(s, h, { x: 0.8, y: y + 0.1, w: 6.2, h: 0.35, fontFace: "Arial", bold: true, fontSize: 15 });
+    text(s, d, { x: 0.8, y: y + 0.45, w: 6.2, h: 0.4, fontSize: 12, color: MUTED });
+  });
   table(s, [
-    ["Corpus (data/kb/)", "Chunks", "Source"],
-    ["MetroPT-3 failure reports", "4", "Real"],
-    ["MetroPT-3 sensor documentation", "6", "Real"],
-    ["Past work orders (optional upload)", "0", "Real, if supplied"],
-  ], { x: 0.6, y: 1.5, w: 6.0, colW: [3.4, 1.0, 1.6], rowH: 0.55 });
-  text(s, bullets([
-    "Chunk at each ## heading",
-    "TF-IDF vectors over words and word pairs",
-    "Rank by cosine similarity; drop scores under 0.05",
-    "Each train's alarms become queries, most serious first",
-    "Quoted with source; nothing generated",
-  ]), { x: 0.6, y: 4.0, w: 6.0, h: 2.6, fontSize: 16, paraSpaceAfter: 6 });
-  card(s, 7.0, 1.5, 5.7, 5.0);
-  text(s, "Query: \"pressure below 7 bar\"", { x: 7.25, y: 1.7, w: 5.2, h: 0.5, fontFace: "Arial", bold: true, fontSize: 17 });
-  text(s, "Top hit (score 0.21)", { x: 7.25, y: 2.35, w: 5.2, h: 0.35, fontSize: 13, color: MUTED });
-  text(s, "\"LPS low-pressure signal\" from metropt3_signals.md (real)", { x: 7.25, y: 2.7, w: 5.2, h: 0.9, fontSize: 15 });
-  text(s, "TS-21's compressor alert", { x: 7.25, y: 3.75, w: 5.2, h: 0.35, fontSize: 13, color: MUTED });
-  text(s, "\"Air production unit (APU) and compressor\" (score 0.25), then the matching air-leak report", { x: 7.25, y: 4.1, w: 5.2, h: 0.9, fontSize: 15 });
-  text(s, "Keyword search over 10 real passages. Adding an LLM answer step is a future option.", { x: 7.25, y: 5.3, w: 5.2, h: 1.0, fontSize: 13, color: MUTED });
+    ["Evaluation (13 labelled cases)", "Result"],
+    ["Guardrail accuracy", "1.0"],
+    ["Retrieval hit@4", "1.0"],
+    ["Cited-answer rate (with API key)", "--llm run"],
+    ["Citation precision (with API key)", "--llm run"],
+  ], { x: 7.5, y: 1.45, w: 5.2, colW: [3.6, 1.6], rowH: 0.5, fontSize: 13 });
+  text(s, "Syllabus: Unit IV retrieval pipelines for grounded reasoning; Unit VI guardrails, prompt filtering, evaluation metrics.", { x: 7.5, y: 4.6, w: 5.2, h: 1.2, fontSize: 13, color: MUTED });
+  s.addNotes("Code: backend/rag/answer.py, GET /kb/answer, backend/rag/evaluate.py, tests/test_answer.py (5 tests with a fake client). Without ANTHROPIC_API_KEY the page shows quotes only and says why. Model claude-opus-5-5, effort low, server-side fallback on refusal.");
 }
 
 // ================= 9. What-if =================
@@ -234,20 +236,20 @@ pres.addSection({ title: "The product" });
 
 // ================= 10. Dashboard + results =================
 {
-  const s = content("Seven-page dashboard; 18 revenue, 3 standby, 4 IBL; all tests passing", "The product");
-  [["Tonight's plan", "Ranked list; reasons, override, knowledge base"], ["Fleet health", "Compressor risk; certs, jobs if loaded"], ["Compressor usage", "Duty, minutes below 7 bar"],
-   ["Depot", "IBL line and why; bays if loaded"], ["What-if simulator", "Scenario in, diff out"], ["Override log", "Overrides and current weights"], ["Knowledge base", "Search real MetroPT-3 docs"]].forEach(([h, d], i) => {
+  const s = content("Seven pages in plain words; 3D depot view; all tests passing", "The product");
+  [["Tonight's plan", "3D depot tracks, reasons, change form"], ["Train health", "Fault chance per train"], ["Compressor use", "Work done, minutes below 7 bar"],
+   ["Depot", "Maintenance line and why"], ["What if…", "Test a change first"], ["Change log", "Who changed what; learned priorities"], ["Fault notes", "Cited answers from real notes"]].forEach(([h, d], i) => {
     const x = 0.6 + (i % 2) * 3.1, y = 1.45 + Math.floor(i / 2) * 1.3;
     card(s, x, y, 2.95, 1.15);
     text(s, h, { x: x + 0.2, y: y + 0.12, w: 2.6, h: 0.4, fontFace: "Arial", bold: true, fontSize: 15 });
     text(s, d, { x: x + 0.2, y: y + 0.55, w: 2.6, h: 0.55, fontSize: 12, color: MUTED });
   });
-  text(s, "Plus /story: a GSAP 3D walkthrough of one night.", { x: 3.7, y: 5.5, w: 2.95, h: 0.9, fontSize: 13, color: MUTED });
-  s.addChart(pres.charts.BAR, [{ name: "Trains", labels: ["Revenue", "Standby", "IBL"], values: [18, 3, 4] }], {
+  text(s, "Labels: In service, Standby, Maintenance (IBL). Plus /story, a 3D walkthrough.", { x: 3.7, y: 5.5, w: 2.95, h: 0.9, fontSize: 13, color: MUTED });
+  s.addChart(pres.charts.BAR, [{ name: "Trains", labels: ["In service", "Standby", "Maintenance"], values: [18, 3, 4] }], {
     x: 7.0, y: 1.4, w: 5.7, h: 2.85, barDir: "col", chartColors: [REV, STB, IBL], showValue: true, dataLabelPosition: "outEnd", dataLabelFontSize: 12,
     valGridLine: { color: RULE, size: 1 }, catGridLine: { style: "none" }, showLegend: false, showTitle: true, title: "Trains per assignment (MetroPT-3 fleet)", ...chartText,
   });
-  table(s, [["Suite", "Result"], ["pytest (backend)", "39 / 39"], ["Vitest (frontend)", "6 / 6"], ["Playwright (browser)", "1 / 1"]],
+  table(s, [["Suite", "Result"], ["pytest (backend)", "44 / 44"], ["Vitest (frontend)", "6 / 6"], ["Playwright (browser)", "1 / 1"]],
     { x: 7.0, y: 4.45, w: 5.7, colW: [3.8, 1.9], rowH: 0.42, fontSize: 13 });
   s.addNotes("Run: git clone, cd, .\\run.ps1 (creates .venv, installs packages; no seeding; API on :8000, dashboard on :3000). Stack: Python, FastAPI, SQLite, OR-Tools CP-SAT, scikit-learn, Next.js 15, Tailwind, shadcn/ui, Recharts, Motion, GSAP. Colour-blind-safe colours; reduced motion respected.");
 }
@@ -260,9 +262,9 @@ pres.addSection({ title: "Wrap-up" });
   text(s, bullets([
     "MetroPT-3 is one Porto train mapped onto 25 Kochi trainsets; the model misses 2 of 4 failures at 50%",
     "Without real uploads, certificates, critical job cards and cleaning are not checked",
-    "Knowledge-base retrieval is keyword-based over 10 real passages",
+    "Retrieval is keyword-based over 10 real passages; written answers need an API key",
     "Overrides are logged but the plan is not re-solved around them",
-        "Next: re-solve after overrides, an LLM answer step over the knowledge base, per-depot capacities, real KMRL certificate, Maximo and depot data",
+        "Next: re-solve after overrides, a ReAct agent over the planner's tools, embeddings for a larger corpus, per-depot capacities, real KMRL certificate, Maximo and depot data",
   ]), { x: 0.8, y: 1.8, w: 11.6, h: 4.8, fontSize: 19, color: WHITE, paraSpaceAfter: 12 });
 }
 

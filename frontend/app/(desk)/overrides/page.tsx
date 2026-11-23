@@ -29,15 +29,15 @@ export default function OverrideLog() {
 
   return (
     <div>
-      <PageHeader title="Override log" />
+      <PageHeader title="Change log" />
       <section aria-labelledby="w" className="mb-6 rounded-xl border bg-card p-5">
         <h2 id="w" className="font-condensed text-2xl font-bold">
-          How overrides shape the optimizer
+          How your changes teach the planner
         </h2>
         <p className="mb-3 text-sm text-muted-foreground">
           {weights.source === "learned"
-            ? `Weights are learned from ${weights.overrides} logged overrides.`
-            : `Using default weights. Learning starts after ${weights.min_required ?? 20} overrides (${weights.overrides} logged so far).`}
+            ? `The planner has adjusted its priorities from ${weights.overrides} recorded changes.`
+            : `Using standard priorities. It starts learning from your changes after ${weights.min_required ?? 20} of them (${weights.overrides} so far).`}
         </p>
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {Object.entries(weights.weights).map(([k, v]) => (
@@ -51,7 +51,7 @@ export default function OverrideLog() {
 
       <section aria-labelledby="log" className="rounded-xl border bg-card p-5">
         <h2 id="log" className="mb-3 font-condensed text-2xl font-bold">
-          Supervisor overrides ({rows.length})
+          Changes made by supervisors ({rows.length})
         </h2>
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">

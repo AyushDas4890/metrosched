@@ -7,7 +7,7 @@ test("generates a ranked plan from MetroPT-3 data", async ({ page, request }) =>
   await page.getByRole("button", { name: "Generate plan" }).click();
   const rows = page.getByTestId("plan-row");
   await expect(rows).toHaveCount(25);
-  await expect(rows.first()).toContainText("Revenue");
+  await expect(rows.first()).toContainText("In service");
   await rows.first().getByRole("button").click();
   await expect(page.getByRole("heading", { name: "Reasons" })).toBeVisible();
 });

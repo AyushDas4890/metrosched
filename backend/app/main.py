@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from ml import apu_risk  # noqa: E402
 from rag import kb  # noqa: E402
+from rag import answer as kb_answer  # noqa: E402
 from ml.learner import features, learn_weights  # noqa: E402
 from optimizer.constraints import (CERT_LABEL, cleaning_due, expired_certificates, goals_not_used, is_fit,  # noqa: E402
                                    open_critical_jobs, rules_not_checked)
@@ -224,6 +225,11 @@ def create_app(db_url: str | None = None) -> FastAPI:
         return {"query": q, "hits": idx.search(q, k=k),
                 "guidance": idx.search(q, k=k, docs=kb.GUIDANCE_DOCS),
                 "past_cases": idx.search(q, k=k, docs=kb.HISTORY_DOCS)}
+
+    @app.get("/kb/answer")
+    def kb_answer_route(q: str = ""):
+        """Short written answer that cites the real fault notes; refuses unsafe questions, falls back to quotes."""
+        return kb_answer.answer(q)
 
     @app.get("/kb/train/{train_id}")
     def kb_train(train_id: str, k: int = 3, db: Session = Depends(get_db)):

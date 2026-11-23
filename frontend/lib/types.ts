@@ -173,3 +173,12 @@ export type Scenario =
   | { type: "crews_absent"; count: number }
   | { type: "critical_job"; train_id: string; description?: string }
   | { type: "required_revenue"; value: number };
+
+export interface KbAnswer {
+  question: string;
+  status: "answered" | "refused" | "no_match" | "quotes_only";
+  answer: string;
+  citations: { passage_id: string; title: string; quote: string }[];
+  passages: KbHit[];
+  reason: string;
+}

@@ -25,19 +25,18 @@ export default function CompressorUsage() {
 
   return (
     <div>
-      <PageHeader title="Compressor usage" />
+      <PageHeader title="Compressor use" />
       <section aria-labelledby="duty" className="mb-8 rounded-xl border bg-card p-5">
         <h2 id="duty" className="font-condensed text-2xl font-bold">
-          Share of time each compressor ran under load (fleet mean {mean}%)
+          How hard each compressor worked (average {mean}%)
         </h2>
         <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
-          Real MetroPT-3 readings: the DV electric signal is on while the compressor works under load. A compressor that runs
-          loaded far more than the rest wears faster, and may be compensating for a leak, so the optimizer slightly prefers
-          low-duty trains for revenue service.
+          Share of time the compressor was pumping air, from real readings. One that works much harder than the rest wears faster
+          and may be covering for a leak, so the planner leans towards the lighter-worked trains for service.
         </p>
         <ul className="mb-3 flex gap-4 text-sm" aria-label="Legend">
-          <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: BELOW }} />At or below mean</li>
-          <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: ABOVE }} />Above mean</li>
+          <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: BELOW }} />Average or less</li>
+          <li className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: ABOVE }} />Above average</li>
         </ul>
         <div className="h-[340px]">
           <ResponsiveContainer>
@@ -46,7 +45,7 @@ export default function CompressorUsage() {
               <XAxis dataKey="train_id" tick={{ fontSize: 11, fill: "var(--foreground)" }} interval={0} angle={-60} textAnchor="end" height={56} />
               <YAxis unit="%" domain={[0, 100]} tick={{ fontSize: 12, fill: "var(--axis)" }} />
               <ReferenceLine y={mean} stroke="var(--axis)" strokeDasharray="4 4" />
-              <Tooltip {...TOOLTIP} formatter={(v) => [`${v}% of the slice under load`, "Compressor duty"]} />
+              <Tooltip {...TOOLTIP} formatter={(v) => [`${v}% of the time pumping`, "Compressor work"]} />
               <Bar dataKey="duty" isAnimationActive={false} radius={[4, 4, 0, 0]}>
                 {duty.map((d) => (
                   <Cell key={d.train_id} fill={d.duty > mean ? ABOVE : BELOW} />
@@ -62,11 +61,11 @@ export default function CompressorUsage() {
           Minutes with air pressure below 7 bar ({low.length} of {rows.length} trains)
         </h2>
         <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
-          Real MetroPT-3 LPS signal, which activates below 7 bar. Each minute counts against revenue service and raises an alert
-          on Tonight&apos;s plan.
+          From the real low-pressure warning signal. Brakes and doors need air above 7 bar, so every minute below it counts against
+          passenger service and shows a warning on Tonight&apos;s plan.
         </p>
         {low.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No train&apos;s slice dropped below 7 bar.</p>
+          <p className="text-sm text-muted-foreground">No train dropped below 7 bar.</p>
         ) : (
           <div className="h-[260px]">
             <ResponsiveContainer>
@@ -84,10 +83,10 @@ export default function CompressorUsage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {!fleet.inputs_loaded.mileage && (
-          <NotLoaded what="mileage" effect="Mileage balancing is not used in the plan." />
+          <NotLoaded what="mileage" effect="Kilometres run are not balanced across trains." />
         )}
         {!fleet.inputs_loaded.branding && (
-          <NotLoaded what="branding contract" effect="Advertiser exposure is not used in the plan." />
+          <NotLoaded what="branding contract" effect="Advert-wrapped trains are not given extra service hours." />
         )}
       </div>
     </div>

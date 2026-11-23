@@ -24,21 +24,20 @@ export function ApuRiskSection({ trains }: { trains: Train[] }) {
   return (
     <section aria-labelledby="apu" className="mb-8 rounded-xl border bg-card p-5">
       <h2 id="apu" className="font-condensed text-2xl font-bold">
-        Compressor (APU) fault risk from real sensor data
+        Chance of an air-compressor fault, per train
       </h2>
       <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
-        Each train is given a 12-hour slice of real air-compressor readings from a Metro do Porto train (MetroPT-3).
-        A model trained on the reported air-leak failures scores the slice. At {threshold}% or more the plan raises an
-        alert, and the optimizer prefers to keep the train out of revenue service.
+        Worked out from real compressor sensor readings (MetroPT-3, a Metro do Porto train, 2020). Each train is matched to 12 hours of those readings.
+        At {threshold}% or more the planner warns you and tries to keep the train out of passenger service.
       </p>
       <ul className="mb-3 flex flex-wrap gap-4 text-sm" aria-label="Legend">
         <li className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm" style={{ background: "var(--ibl)" }} />
-          At or above alert level
+          Warning: likely fault
         </li>
         <li className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm" style={{ background: "var(--revenue)" }} />
-          Below alert level
+          Normal
         </li>
       </ul>
       <div className="h-[520px]">
@@ -51,8 +50,8 @@ export function ApuRiskSection({ trains }: { trains: Train[] }) {
             <Tooltip
               {...TOOLTIP}
               formatter={(v, _n, p) => [
-                `${v}% (slice ${p.payload.apu.slice_start} to ${p.payload.apu.slice_end})`,
-                p.payload.apu.reported_failure_in_slice ? "Risk · reported air leak in slice" : "Risk",
+                `${v}% (readings ${p.payload.apu.slice_start} to ${p.payload.apu.slice_end})`,
+                p.payload.apu.reported_failure_in_slice ? "Fault chance · real air leak in this period" : "Fault chance",
               ]}
             />
             <Bar dataKey="risk" radius={[0, 4, 4, 0]} isAnimationActive={false}>
@@ -67,22 +66,22 @@ export function ApuRiskSection({ trains }: { trains: Train[] }) {
       {model && (
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Reported failures caught" value={`${model.metrics.events_detected} of ${model.metrics.events}`} />
-          <Stat label="ROC AUC" value={model.metrics.roc_auc.toFixed(3)} />
-          <Stat label="Failure windows flagged" value={`${Math.round(model.metrics.recall_at_0_5 * 100)}%`} />
-          <Stat label="False alarms (per window)" value={`${(model.metrics.false_alarm_rate_at_0_5 * 100).toFixed(1)}%`} />
+          <Stat label="Accuracy score (1 = perfect)" value={model.metrics.roc_auc.toFixed(2)} />
+          <Stat label="Fault hours warned about" value={`${Math.round(model.metrics.recall_at_0_5 * 100)}%`} />
+          <Stat label="False warnings" value={`${(model.metrics.false_alarm_rate_at_0_5 * 100).toFixed(1)}%`} />
         </dl>
       )}
 
       <details className="mt-3 text-sm">
-        <summary className="cursor-pointer">Show sensor slices per train</summary>
+        <summary className="cursor-pointer">Show the readings used for each train</summary>
         <div className="overflow-x-auto">
           <table className="mt-2 w-full text-left">
             <thead>
               <tr className="border-b text-muted-foreground">
                 <th className="py-1">Train</th>
                 <th>Risk</th>
-                <th>Sensor slice (2020)</th>
-                <th>Reported air leak in slice</th>
+                <th>Readings from (2020)</th>
+                <th>Real air leak in that period</th>
               </tr>
             </thead>
             <tbody>
@@ -101,8 +100,8 @@ export function ApuRiskSection({ trains }: { trains: Train[] }) {
         </div>
       </details>
       <p className="mt-3 text-xs text-muted-foreground">
-        Source: {model?.source ?? "MetroPT-3, UCI Machine Learning Repository (CC BY 4.0)"}. The sensor data is real;
-        assigning slices to these synthetic trainsets is a modelling assumption.
+        Source: {model?.source ?? "MetroPT-3, UCI Machine Learning Repository (CC BY 4.0)"}. The readings are real;
+        matching each 12-hour period to a Kochi trainset is a planning assumption.
       </p>
     </section>
   );

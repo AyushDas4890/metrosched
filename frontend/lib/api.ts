@@ -1,4 +1,4 @@
-import type { ApuModel, FleetStatus, KbHit, KbTopic, Override, Plan, Scenario, SimulateResult } from "./types";
+import type { ApuModel, FleetStatus, KbAnswer, KbHit, KbTopic, Override, Plan, Scenario, SimulateResult } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -29,6 +29,7 @@ export const api = {
     call<Override>("/plan/override", { method: "POST", body: JSON.stringify(body) }),
   overrides: () => call<Override[]>("/plan/overrides"),
   kbSearch: (q: string, k = 8) => call<{ query: string; hits: KbHit[]; guidance: KbHit[]; past_cases: KbHit[] }>(`/kb/search?q=${encodeURIComponent(q)}&k=${k}`),
+  kbAnswer: (q: string) => call<KbAnswer>(`/kb/answer?q=${encodeURIComponent(q)}`),
   kbTrain: (id: string) => call<{ train_id: string; related: KbTopic[] }>(`/kb/train/${encodeURIComponent(id)}`),
   apuModel: () => call<ApuModel>("/apu/model"),
   weights: () => call<{ weights: Record<string, number>; source: string; overrides: number; min_required?: number }>("/ml/weights"),

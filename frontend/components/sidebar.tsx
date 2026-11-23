@@ -7,13 +7,13 @@ import { Wordmark } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Tonight's plan" },
-  { href: "/fleet", label: "Fleet health" },
-  { href: "/usage", label: "Compressor usage" },
-  { href: "/depot", label: "Depot bay map" },
-  { href: "/simulate", label: "What-if simulator" },
-  { href: "/overrides", label: "Override log" },
-  { href: "/knowledge", label: "Knowledge base" },
+  { href: "/", label: "Tonight's plan", hint: "Which train goes where" },
+  { href: "/fleet", label: "Train health", hint: "Fault risk per train" },
+  { href: "/usage", label: "Compressor use", hint: "Air pressure and load" },
+  { href: "/depot", label: "Depot", hint: "Maintenance line" },
+  { href: "/simulate", label: "What if…", hint: "Test a change first" },
+  { href: "/overrides", label: "Change log", hint: "Who changed what" },
+  { href: "/knowledge", label: "Fault notes", hint: "Search past failures" },
 ];
 
 export function Sidebar() {
@@ -48,6 +48,7 @@ export function Sidebar() {
                 )}
               >
                 {n.label}
+                <span className="hidden text-xs font-normal text-muted-foreground md:block">{n.hint}</span>
               </Link>
             </li>
           );

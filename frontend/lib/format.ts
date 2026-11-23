@@ -1,9 +1,9 @@
 import type { Assignment, PlanItem, Train } from "./types";
 
 export const ASSIGNMENT_LABEL: Record<Assignment, string> = {
-  REVENUE: "Revenue",
+  REVENUE: "In service",
   STANDBY: "Standby",
-  IBL: "IBL / maintenance",
+  IBL: "Maintenance (IBL)",
 };
 
 export function countBy(items: PlanItem[]): Record<Assignment, number> {
