@@ -332,6 +332,8 @@ terms.append(int(weights["shunting"] * 10) * mv)</code></pre>
       - w_shunting  * (bay_position - 1)
       - w_maintenance * open_noncritical_jobs
       - w_apu_risk * compressor_risk / 10
+      - w_low_pressure * min(minutes_below_7_bar, 60) / 10
+      - w_duty * (duty - mean_duty) * 10
       - 100 if the train is unfit</code></pre>
 <p>Ranking sorts by assignment group (Revenue, then Standby, then IBL), then by score (highest first), then by train ID.</p>
 <h2>5.6 When no plan is possible: the relaxation report</h2>

@@ -145,27 +145,45 @@ pres.addSection({ title: "How it works" });
   s.addNotes("Variables: one yes/no per train per assignment plus one per blocked exit. If no plan fits, the solver returns the smallest relaxation, e.g. 'Relax required revenue by 2'. One solver thread so tied plans resolve the same way each run. An independent checker re-verifies every hard rule in the tests.");
 }
 
-// ================= 6. Explanations + overrides =================
+// ================= 6. Ranking =================
 {
-  const s = content("Every assignment explained; the supervisor has the last word", "How it works");
-  [["TS-08", REV, "Revenue", ["Fitness not verified (no certificate or job-card data)", "Fault risk 0%; compressor loaded 5% vs fleet mean 23%"]],
-   ["TS-21", IBL, "IBL", ["Sent to IBL: high compressor (APU) fault risk", "94% from real MetroPT-3 slice 29–30 May 2020 (reported air leak)"]],
-   ["TS-03", IBL, "IBL", ["Sent to IBL: air pressure fell below 7 bar", "89 min below 7 bar; real 15 July leak the risk model missed (4%)"]]].forEach(([id, c, a, rs], i) => {
-    const y = 1.45 + i * 1.32;
-    card(s, 0.6, y, 7.6, 1.18);
-    plate(s, id, 0.8, y + 0.15, INK, WHITE);
-    tag(s, a, c, 0.8, y + 0.65, 1.05);
-    text(s, bullets(rs), { x: 2.1, y: y + 0.17, w: 5.95, h: 0.95, fontSize: 14, paraSpaceAfter: 3 });
+  const s = content("How ranking is done: track first, then fit score", "How it works");
+  const steps = [
+    ["1  Solver picks the track", "CP-SAT places every train: In service, Standby or Maintenance (IBL)"],
+    ["2  Each train gets a fit score", "Same formula for all trains, whatever track they got"],
+    ["3  Sort the list", "Track order (service → standby → IBL), then score high → low, then train ID"],
+  ];
+  steps.forEach(([h, d], i) => {
+    const y = 1.45 + i * 0.95;
+    card(s, 0.6, y, 5.6, 0.82);
+    text(s, h, { x: 0.8, y: y + 0.08, w: 5.2, h: 0.35, fontFace: "Arial", bold: true, fontSize: 15 });
+    text(s, d, { x: 0.8, y: y + 0.43, w: 5.2, h: 0.35, fontSize: 12, color: MUTED });
   });
-  text(s, "Rule-based, no language model: the same input always gives the same words.", { x: 0.6, y: 5.5, w: 7.6, h: 0.6, fontSize: 14, color: MUTED });
-  card(s, 8.6, 1.45, 4.1, 5.05);
-  text(s, "Overrides and learning", { x: 8.85, y: 1.65, w: 3.6, h: 0.5, fontFace: "Arial", bold: true, fontSize: 18 });
-  text(s, bullets([
-    "Pick a new assignment and give a reason; it is logged",
-    "A train with a known blocking fault cannot leave IBL",
-    "After 20 overrides a logistic regression re-weights the soft goals",
-    "Limitation: the plan is not re-solved around an override",
-  ]), { x: 8.85, y: 2.3, w: 3.65, h: 4.0, fontSize: 15, paraSpaceAfter: 8 });
+  card(s, 0.6, 4.4, 5.6, 2.15, "FBF4E6");
+  text(s, "Fit score (optimizer/model.py)", { x: 0.8, y: 4.5, w: 5.2, h: 0.35, fontFace: "Arial", bold: true, fontSize: 14 });
+  text(s, [
+    { text: "score = 50", options: { breakLine: true } },
+    { text: "  − 500 × fault risk / 10", options: { breakLine: true } },
+    { text: "  − 5 × min(minutes below 7 bar, 60) / 10", options: { breakLine: true } },
+    { text: "  − 2 × (duty − fleet mean duty) × 10", options: { breakLine: true } },
+    { text: "  − 100 if unfit;  ± branding, mileage, bay if loaded" },
+  ], { x: 0.8, y: 4.9, w: 5.3, h: 1.6, fontFace: "Consolas", fontSize: 12 });
+
+  table(s, [
+    ["Rank", "Train", "Track", "Risk", "< 7 bar", "Duty", "Score"],
+    ["1", "TS-08", "In service", "0%", "0 min", "5%", "53.5"],
+    ["18", "TS-16", "In service", "34%", "0 min", "15%", "34.5"],
+    ["19", "TS-22", "Standby", "23%", "0 min", "79%", "27.3"],
+    ["22", "TS-03", "IBL", "4%", "89 min", "57%", "11.0"],
+    ["24", "TS-09", "IBL", "86%", "6 min", "26%", "3.1"],
+    ["25", "TS-21", "IBL", "94%", "0 min", "61%", "−4.3"],
+  ], { x: 6.5, y: 1.45, w: 6.2, colW: [0.65, 0.85, 1.15, 0.75, 0.95, 0.8, 1.05], rowH: 0.42, fontSize: 12 });
+  text(s, [
+    { text: "Worked: ", options: { bold: true } },
+    { text: "TS-21 = 50 − 46.8 (risk 94%) − 7.6 (duty 61% vs mean 23%) = −4.3. TS-08 = 50 + 3.5 (duty below mean) = 53.5." },
+  ], { x: 6.5, y: 4.55, w: 6.2, h: 0.9, fontSize: 13 });
+  text(s, "The score only orders the list; the solver decides the track. So TS-22 (27.3) sits below TS-16 (34.5) because it is on standby.", { x: 6.5, y: 5.5, w: 6.2, h: 0.9, fontSize: 13, color: MUTED });
+  s.addNotes("Real numbers from the MetroPT-3 fleet (fleet mean duty 22.6%). Each train's reasons are rule-based, built from the same data, so the same input always gives the same words, e.g. TS-21: 'Sent to IBL: high compressor (APU) fault risk, 94% from the real slice 29–30 May 2020 (reported air leak)'. Supervisors can change a placement with a reason; it is logged, and after 20 changes a logistic regression re-weights the goals. A train with a known blocking fault cannot leave IBL.");
 }
 
 // ================= 7. MetroPT-3 risk =================
